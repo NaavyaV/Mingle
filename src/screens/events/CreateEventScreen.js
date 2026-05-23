@@ -8,6 +8,7 @@ import TextField from '../../components/TextField';
 import Button from '../../components/Button';
 import SegmentedControl from '../../components/SegmentedControl';
 import TimeSpinner from '../../components/TimeSpinner';
+import PatternBackground from '../../components/PatternBackground';
 
 import { api } from '../../api/client';
 import { useUser } from '../../context/UserContext';
@@ -71,6 +72,7 @@ export default function CreateEventScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PatternBackground />
       <Header
         title="Host an event"
         left={

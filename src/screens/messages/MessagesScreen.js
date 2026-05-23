@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import PatternBackground from '../../components/PatternBackground';
 
 import Header from '../../components/Header';
 import SearchBar from '../../components/SearchBar';
@@ -57,6 +58,7 @@ export default function MessagesScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PatternBackground />
       <Header title="Messages" />
       <View style={styles.searchWrap}>
         <SearchBar value={query} onChangeText={setQuery} placeholder="Search conversations" />

@@ -4,8 +4,12 @@ import Card from '../../../components/Card';
 import Button from '../../../components/Button';
 import SegmentedControl from '../../../components/SegmentedControl';
 import CalendarView from '../../../components/CalendarView';
+import GoogleCalendarImportModal from '../../../components/GoogleCalendarImportModal';
+import { api } from '../../../api/client';
 import { buildDemoSchedule, getRange, shortMonth } from '../../../utils/schedule';
-import { colors, radius, spacing, typography } from '../../../theme';
+import { colors, spacing, typography } from '../../../theme';
+
+const DEFAULT_GCAL_URL = process.env.EXPO_PUBLIC_DEFAULT_GCAL_URL || '';
 
 const VISIBILITY_OPTIONS = [
   { label: 'Private', value: 'private' },
@@ -44,8 +48,11 @@ function rangeLabel(dates) {
 export default function ScheduleStep({ value, setValue }) {
   const [viewMode, setViewMode] = useState('week');
   const [anchorDate] = useState(() => new Date());
+  const [gcalOpen, setGcalOpen] = useState(false);
+  const [gcalBusy, setGcalBusy] = useState(false);
   const schedule = value.schedule;
   const hasSchedule = !!schedule;
+  const isGoogle = value.scheduleSource === 'google';
 
   const dates = useMemo(() => getRange(viewMode, anchorDate), [viewMode, anchorDate]);
 
@@ -65,17 +72,34 @@ export default function ScheduleStep({ value, setValue }) {
     });
   };
 
-  const handleGoogle = () => {
-    Alert.alert(
-      'Coming soon',
-      'Google Calendar import is not wired up yet. Use the demo schedule for now.'
-    );
+  // If a default URL is configured (EXPO_PUBLIC_DEFAULT_GCAL_URL), the
+  // button instantly imports — no extra paste step. Otherwise it falls
+  // back to the paste-URL modal.
+  const handleGoogle = async () => {
+    if (!DEFAULT_GCAL_URL) {
+      setGcalOpen(true);
+      return;
+    }
+    try {
+      setGcalBusy(true);
+      const { schedule: imported, eventCount } = await api.previewCalendar(DEFAULT_GCAL_URL);
+      handleGoogleImported({ schedule: imported, icalFeedUrl: DEFAULT_GCAL_URL, eventCount });
+    } catch (e) {
+      Alert.alert('Could not import', e?.message || 'Check your connection and try again.');
+    } finally {
+      setGcalBusy(false);
+    }
   };
 
-  const handleIcal = () => {
+  const handleGoogleImported = ({ schedule: imported, icalFeedUrl, eventCount }) => {
+    setValue({
+      schedule: imported,
+      scheduleSource: 'google',
+      icalFeedUrl,
+    });
     Alert.alert(
-      'Coming soon',
-      'iCal import is not wired up yet. Use the demo schedule for now.'
+      'Google Calendar connected',
+      `${eventCount} event${eventCount === 1 ? '' : 's'} loaded. Your schedule will stay in sync from the calendar tab.`
     );
   };
 
@@ -87,18 +111,11 @@ export default function ScheduleStep({ value, setValue }) {
     >
       <View style={styles.importRow}>
         <Button
-          title="Google Calendar"
+          title={gcalBusy ? 'Importing…' : 'Import from Google Calendar'}
           variant="outline"
           onPress={handleGoogle}
-          fullWidth={false}
-          style={{ flex: 1 }}
-        />
-        <Button
-          title="iCal"
-          variant="outline"
-          onPress={handleIcal}
-          fullWidth={false}
-          style={{ flex: 1 }}
+          loading={gcalBusy}
+          fullWidth
         />
       </View>
 
@@ -121,6 +138,7 @@ export default function ScheduleStep({ value, setValue }) {
             <Text style={styles.calendarRangeLabel}>{rangeLabel(dates)}</Text>
             <Text style={styles.calendarSubLabel}>
               {schedule.items.length} events · {schedule.timeZone}
+              {isGoogle ? ' · Google Calendar' : ''}
             </Text>
           </View>
 
@@ -156,6 +174,12 @@ export default function ScheduleStep({ value, setValue }) {
           {VISIBILITY_HINT[value.scheduleVisibility]}
         </Text>
       </View>
+
+      <GoogleCalendarImportModal
+        visible={gcalOpen}
+        onClose={() => setGcalOpen(false)}
+        onImported={handleGoogleImported}
+      />
     </ScrollView>
   );
 }
@@ -164,7 +188,7 @@ ScheduleStep.canContinue = (v) => !!v.schedule;
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.md, paddingBottom: spacing.xl },
-  importRow: { flexDirection: 'row', gap: spacing.md },
+  importRow: { gap: spacing.md },
   dividerWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   divider: { flex: 1, height: 1, backgroundColor: colors.border },
   dividerText: { ...typography.caption, color: colors.textMuted },

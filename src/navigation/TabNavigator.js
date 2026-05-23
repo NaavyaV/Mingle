@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
 
 import { colors } from '../theme';
+import { useUnread } from '../context/UnreadContext';
 
 // Home / Map
 import HomeScreen from '../screens/home/HomeScreen';
@@ -17,6 +18,7 @@ import NewMessageScreen from '../screens/messages/NewMessageScreen';
 // Calendar
 import MyCalendarScreen from '../screens/calendar/MyCalendarScreen';
 import AddEventScreen from '../screens/calendar/AddEventScreen';
+import RemoveEventScreen from '../screens/calendar/RemoveEventScreen';
 
 // Friends
 import FriendsOverlapScreen from '../screens/friends/FriendsOverlapScreen';
@@ -63,6 +65,7 @@ function CalendarStack() {
     <Stack.Navigator screenOptions={stackOptions()}>
       <Stack.Screen name="MyCalendar" component={MyCalendarScreen} />
       <Stack.Screen name="AddEvent" component={AddEventScreen} />
+      <Stack.Screen name="RemoveEvent" component={RemoveEventScreen} />
     </Stack.Navigator>
   );
 }
@@ -99,27 +102,41 @@ const tabIcons = {
 };
 
 export default function TabNavigator() {
+  const { total: unreadTotal } = useUnread();
   return (
     <Tab.Navigator
+      initialRouteName="HomeTab"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
           backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          height: Platform.OS === 'ios' ? 96 : 76,
-          paddingTop: 10,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+          // Drop the default 1px hairline border in favor of a soft
+          // top-edge shadow that lifts the bar off the content below.
+          borderTopWidth: 0,
+          borderTopColor: 'transparent',
+          height: Platform.OS === 'ios' ? 84 : 64,
+          paddingTop: 6,
+          paddingBottom: Platform.OS === 'ios' ? 24 : 6,
+          // Inset the tab items from the screen edges so they don't
+          // sit flush against the rounded-corner safe areas.
+          paddingHorizontal: 22,
+          shadowColor: '#0B1020',
+          shadowOffset: { width: 0, height: -3 },
+          shadowOpacity: 0.08,
+          shadowRadius: 10,
+          elevation: 12,
         },
-        tabBarLabelStyle: { fontSize: 12, fontWeight: '600', marginTop: 2 },
-        tabBarIconStyle: { marginTop: 2 },
+        tabBarItemStyle: { paddingHorizontal: 2 },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginTop: 1 },
+        tabBarIconStyle: { marginTop: 0 },
         tabBarIcon: ({ focused, color }) => {
           const set = tabIcons[route.name] || tabIcons.HomeTab;
           return (
             <Ionicons
               name={focused ? set.focused : set.unfocused}
-              size={30}
+              size={26}
               color={color}
             />
           );
@@ -140,7 +157,19 @@ export default function TabNavigator() {
       <Tab.Screen
         name="MessagesTab"
         component={MessagesStack}
-        options={{ title: 'Messages' }}
+        options={{
+          title: 'Messages',
+          tabBarBadge: unreadTotal > 0 ? (unreadTotal > 9 ? '9+' : unreadTotal) : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: colors.danger,
+            color: '#fff',
+            fontSize: 11,
+            fontWeight: '800',
+            minWidth: 18,
+            height: 18,
+            lineHeight: 16,
+          },
+        }}
       />
       <Tab.Screen
         name="EventsTab"

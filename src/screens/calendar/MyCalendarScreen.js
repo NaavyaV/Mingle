@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { View, StyleSheet, Dimensions, Alert } from 'react-native';
+import { View, StyleSheet, Dimensions, Alert, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -10,11 +10,14 @@ import CalendarView from '../../components/CalendarView';
 import CalendarRangeBar, { buildRange } from '../../components/CalendarRangeBar';
 import Button from '../../components/Button';
 import EmptyState from '../../components/EmptyState';
+import PatternBackground from '../../components/PatternBackground';
+import GoogleCalendarImportModal from '../../components/GoogleCalendarImportModal';
 
 import { api } from '../../api/client';
 import { useUser } from '../../context/UserContext';
-import { buildDemoSchedule, formatEventTime } from '../../utils/schedule';
 import { colors, radius, spacing } from '../../theme';
+
+const DEFAULT_GCAL_URL = process.env.EXPO_PUBLIC_DEFAULT_GCAL_URL || '';
 
 export default function MyCalendarScreen({ navigation }) {
   const { user, setUser } = useUser();
@@ -24,7 +27,11 @@ export default function MyCalendarScreen({ navigation }) {
     d.setHours(0, 0, 0, 0);
     return d;
   }, []);
-  const [resyncing, setResyncing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [gcalOpen, setGcalOpen] = useState(false);
+
+  const isGoogle =
+    user?.scheduleSource === 'google' || user?.schedule?.source === 'google';
 
   // Refresh user from server on focus so adding events on the next
   // screen flows back into the calendar.
@@ -48,64 +55,76 @@ export default function MyCalendarScreen({ navigation }) {
 
   const resync = async () => {
     if (!user?._id) return;
+    // Not yet connected to Google → either instant-connect (when a
+    // default URL is configured) or open the paste-URL modal.
+    if (!isGoogle) {
+      if (DEFAULT_GCAL_URL) {
+        try {
+          setSyncing(true);
+          const updated = await api.connectCalendar(user._id, DEFAULT_GCAL_URL);
+          await setUser(updated);
+          Alert.alert(
+            'Google Calendar connected',
+            `${updated.eventCount ?? updated.schedule?.items?.length ?? 0} events imported.`
+          );
+        } catch (e) {
+          Alert.alert('Could not connect', e?.message || 'Try again.');
+        } finally {
+          setSyncing(false);
+        }
+        return;
+      }
+      Alert.alert(
+        'Demo schedule',
+        "This schedule won't auto-refresh. Connect Google Calendar to pull your real events.",
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Connect', onPress: () => setGcalOpen(true) },
+        ]
+      );
+      return;
+    }
     try {
-      setResyncing(true);
-      const schedule = buildDemoSchedule();
-      const updated = await api.updateUser(user._id, { schedule });
+      setSyncing(true);
+      const updated = await api.syncCalendar(user._id);
       await setUser(updated);
+      Alert.alert(
+        'Calendar updated',
+        `${updated.eventCount ?? updated.schedule?.items?.length ?? 0} events loaded from Google Calendar.`
+      );
     } catch (e) {
-      Alert.alert('Could not resync', e?.message || 'Try again.');
+      Alert.alert('Could not sync', e?.message || 'Try again.');
     } finally {
-      setResyncing(false);
+      setSyncing(false);
     }
   };
 
-  const removeNext = async () => {
-    const items = Array.isArray(user?.schedule?.items) ? user.schedule.items : [];
-    const sorted = items
-      .slice()
-      .sort((a, b) => new Date(a.start.dateTime) - new Date(b.start.dateTime));
-    const next = sorted.find((e) => new Date(e.start.dateTime) >= new Date());
-    if (!next) {
-      Alert.alert('No upcoming events to remove.');
-      return;
+  const handleGoogleConnected = async ({ schedule, icalFeedUrl, eventCount }) => {
+    if (!user?._id) return;
+    try {
+      setSyncing(true);
+      const updated = await api.connectCalendar(user._id, icalFeedUrl);
+      await setUser(updated);
+      Alert.alert(
+        'Google Calendar connected',
+        `${eventCount ?? updated.schedule?.items?.length ?? 0} events imported.`
+      );
+    } catch (e) {
+      Alert.alert('Could not save', e?.message || 'Try again.');
+    } finally {
+      setSyncing(false);
     }
-    Alert.alert(
-      `Remove "${next.summary}"?`,
-      `${formatEventTime(next)}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const remaining = items.filter((e) => e.id !== next.id);
-              const updated = await api.updateUser(user._id, {
-                schedule: {
-                  ...(user.schedule || { kind: 'calendar#events' }),
-                  items: remaining,
-                  updated: new Date().toISOString(),
-                },
-              });
-              await setUser(updated);
-            } catch (e) {
-              Alert.alert('Could not remove', e?.message || 'Try again.');
-            }
-          },
-        },
-      ]
-    );
   };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PatternBackground />
       <Header
         title="My Calendar"
         subtitle={user?.school}
         right={
           <IconButton
-            icon={resyncing ? 'hourglass-outline' : 'sync-outline'}
+            icon={syncing ? 'hourglass-outline' : 'sync-outline'}
             variant="ghost"
             onPress={resync}
             accessibilityLabel="Resync calendar"
@@ -113,7 +132,12 @@ export default function MyCalendarScreen({ navigation }) {
         }
       />
 
-      <View style={styles.content}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <CalendarRangeBar mode={mode} onChangeMode={setMode} anchor={anchor} />
 
         <View style={styles.calendarWrap}>
@@ -144,14 +168,21 @@ export default function MyCalendarScreen({ navigation }) {
           </View>
           <View style={{ flex: 1 }}>
             <Button
-              title="Remove next"
+              title="Remove event"
               variant="outline"
-              leading={<Ionicons name="remove" size={18} color={colors.primary} />}
-              onPress={removeNext}
+              leading={<Ionicons name="trash-outline" size={18} color={colors.primary} />}
+              onPress={() => navigation.navigate('RemoveEvent')}
             />
           </View>
         </View>
-      </View>
+      </ScrollView>
+
+      <GoogleCalendarImportModal
+        visible={gcalOpen}
+        onClose={() => setGcalOpen(false)}
+        onImported={handleGoogleConnected}
+        title="Connect Google Calendar"
+      />
     </SafeAreaView>
   );
 }
@@ -159,9 +190,8 @@ export default function MyCalendarScreen({ navigation }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   content: {
-    flex: 1,
     paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.xl,
     gap: spacing.sm,
   },
   calendarWrap: { borderRadius: radius.lg, flexShrink: 1 },

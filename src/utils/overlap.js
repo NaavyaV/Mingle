@@ -56,6 +56,7 @@ function collectIntervals(users, days) {
  */
 export function buildOverlapSchedule(users, days, me = null) {
   const intervals = collectIntervals(users, days);
+  const myOwnIntervals = me ? collectIntervals([me], days) : [];
 
   const friendItems = intervals.map((iv, i) => ({
     id: `overlap-${i}`,
@@ -67,8 +68,7 @@ export function buildOverlapSchedule(users, days, me = null) {
     by: iv.by,
   }));
 
-  const myIntervals = me ? collectIntervals([me], days) : [];
-  const myItems = myIntervals.map((iv, i) => ({
+  const myItems = myOwnIntervals.map((iv, i) => ({
     id: `me-${i}`,
     summary: '',
     start: { dateTime: iv.start.toISOString() },
@@ -95,7 +95,16 @@ export function buildOverlapSchedule(users, days, me = null) {
     );
   };
 
-  return { schedule, bookedAt };
+  // Whether the viewer is busy at this moment, independent of friends.
+  const meBusyAt = (date) => {
+    if (!myOwnIntervals.length) return false;
+    const t = date instanceof Date ? date.getTime() : new Date(date).getTime();
+    return myOwnIntervals.some(
+      (iv) => iv.start.getTime() <= t && t < iv.end.getTime()
+    );
+  };
+
+  return { schedule, bookedAt, meBusyAt };
 }
 
 export { DAY_MS };

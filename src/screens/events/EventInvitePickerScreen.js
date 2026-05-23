@@ -8,6 +8,7 @@ import Button from '../../components/Button';
 import SearchBar from '../../components/SearchBar';
 import EmptyState from '../../components/EmptyState';
 import FriendCheckRow from '../../components/friends/FriendCheckRow';
+import PatternBackground from '../../components/PatternBackground';
 
 import { api } from '../../api/client';
 import { useUser } from '../../context/UserContext';
@@ -87,6 +88,7 @@ export default function EventInvitePickerScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PatternBackground />
       <Header
         title="Invite friends"
         subtitle={`${picked.size} selected`}

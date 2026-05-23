@@ -99,4 +99,15 @@ export const api = {
       method: 'POST',
       body: { username, going },
     }),
+
+  // Google Calendar (iCal feed)
+  previewCalendar: (icalUrl) =>
+    request('/api/calendar/preview', { method: 'POST', body: { icalUrl } }),
+  connectCalendar: (userId, icalUrl) =>
+    request(`/api/calendar/users/${userId}/connect`, {
+      method: 'POST',
+      body: { icalUrl },
+    }),
+  syncCalendar: (userId) =>
+    request(`/api/calendar/users/${userId}/sync`, { method: 'POST' }),
 };

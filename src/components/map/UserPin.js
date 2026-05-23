@@ -7,7 +7,10 @@ import { colors, radius, shadow, spacing, typography } from '../../theme';
  * floating above it. Designed to sit inside a react-native-maps Marker
  * so the pin stays the same pixel size regardless of zoom level.
  *
- * `isMe` highlights the pin with a coral ring under the feet.
+ * On Apple Maps the surrounding <Marker> doesn't always forward taps
+ * to its `onPress` handler when it contains a custom view, so we put
+ * a Pressable here and fire `onPress` from React Native directly. The
+ * caller should pass the same handler it would have given Marker.
  */
 export default function UserPin({ user, status, isMe = false, onPress }) {
   const name = isMe ? 'You' : user?.name?.split(' ')[0] || user?.username;
@@ -15,6 +18,7 @@ export default function UserPin({ user, status, isMe = false, onPress }) {
   return (
     <Pressable
       onPress={onPress}
+      hitSlop={8}
       style={({ pressed }) => [styles.wrap, pressed && { opacity: 0.85 }]}
     >
       {status ? (
@@ -48,7 +52,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: radius.md,
     marginBottom: 2,
-    maxWidth: 110,
+    maxWidth: 130,
+    alignSelf: 'center',
     ...shadow.soft,
   },
   statusText: {

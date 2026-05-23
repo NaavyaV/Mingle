@@ -29,7 +29,7 @@ export default function UserCard({ user, date, highlight = false }) {
           <Text style={styles.handle}>@{user.username}</Text>
           {user.school ? <Text style={styles.meta}>{user.school}</Text> : null}
           <View style={styles.pillRow}>
-            <StatusPill label={user.status || 'around campus'} />
+            {user.status ? <StatusPill label={user.status} /> : null}
             <View
               style={[
                 styles.visibilityChip,

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import PatternBackground from '../../components/PatternBackground';
 
 import Header from '../../components/Header';
 import IconButton from '../../components/IconButton';
@@ -47,6 +48,7 @@ export default function FriendsFilterScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PatternBackground />
       <Header
         title="Filter friends"
         subtitle={`${selected.size} / ${friends.length} selected`}

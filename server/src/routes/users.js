@@ -32,6 +32,7 @@ router.post('/', async (req, res, next) => {
       interests,
       schedule,
       scheduleSource,
+      icalFeedUrl,
       scheduleVisibility,
       locationStatus,
       avatar,
@@ -57,10 +58,11 @@ router.post('/', async (req, res, next) => {
       interests: Array.isArray(interests) ? interests : [],
       schedule: schedule || null,
       scheduleSource: scheduleSource || null,
+      icalFeedUrl: icalFeedUrl || null,
       scheduleVisibility: scheduleVisibility || 'friends',
       locationStatus: locationStatus || 'pending',
       avatar: avatar || null,
-      status: status || 'around campus',
+      status: typeof status === 'string' ? status : '',
     });
 
     res.status(201).json(user.toJSON());

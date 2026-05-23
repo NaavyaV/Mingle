@@ -9,6 +9,7 @@ import SearchBar from '../../components/SearchBar';
 import SegmentedControl from '../../components/SegmentedControl';
 import EmptyState from '../../components/EmptyState';
 import FriendRow from '../../components/friends/FriendRow';
+import PatternBackground from '../../components/PatternBackground';
 
 import { api } from '../../api/client';
 import { useUser } from '../../context/UserContext';
@@ -84,7 +85,7 @@ export default function MyFriendsScreen({ navigation }) {
     if (rel.friends.includes(other)) {
       return {
         primary: {
-          label: 'Friends',
+          label: 'Unfriend',
           variant: 'outline',
           onPress: () => handleAction(other, 'remove'),
         },
@@ -100,6 +101,7 @@ export default function MyFriendsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PatternBackground />
       <Header
         title="My Friends"
         left={

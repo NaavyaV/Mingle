@@ -20,6 +20,7 @@ const ScheduleEventSchema = new Schema(
 const ScheduleSchema = new Schema(
   {
     kind: { type: String, default: 'calendar#events' },
+    source: { type: String, enum: ['demo', 'google', 'ical'], default: null },
     timeZone: String,
     updated: String,
     items: [ScheduleEventSchema],
@@ -50,6 +51,8 @@ const UserSchema = new Schema(
       enum: ['demo', 'google', 'ical', null],
       default: null,
     },
+    // Secret Google Calendar iCal URL — used server-side for resync only.
+    icalFeedUrl: { type: String, default: null, select: false },
     scheduleVisibility: {
       type: String,
       enum: ['private', 'friends', 'public'],
@@ -61,7 +64,7 @@ const UserSchema = new Schema(
       default: 'pending',
     },
     avatar: { type: AvatarSchema, default: null },
-    status: { type: String, default: 'around campus' },
+    status: { type: String, default: '' },
   },
   { timestamps: true }
 );

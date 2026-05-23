@@ -54,6 +54,7 @@ function EventBlock({ event, columnWidth }) {
 
   return (
     <View
+      pointerEvents="none"
       style={[
         styles.event,
         {
@@ -76,6 +77,33 @@ function EventBlock({ event, columnWidth }) {
         </Text>
       ) : null}
     </View>
+  );
+}
+
+/**
+ * Visual highlight for the currently-selected 15-min slot. Renders as
+ * an overlay underneath the event blocks so the tapped time is clearly
+ * marked while still letting events read on top.
+ */
+function SelectionHighlight({ selectedAt, columnWidth }) {
+  if (!selectedAt) return null;
+  const frac = fractionalHour(selectedAt) - DAY_START;
+  if (frac < 0 || frac > TOTAL_HOURS) return null;
+  const top = Math.round(frac * HOUR_HEIGHT);
+  const height = Math.round(HOUR_HEIGHT / 4); // 15 minutes
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        styles.selection,
+        {
+          top,
+          height,
+          left: 1,
+          width: Math.max(0, Math.floor(columnWidth) - 2),
+        },
+      ]}
+    />
   );
 }
 
@@ -118,6 +146,7 @@ export default function CalendarView({
   dates,
   columnWidth,
   onPressTime,
+  selectedAt,
   maxHeight = 260,
 }) {
   const hours = useMemo(
@@ -182,37 +211,56 @@ export default function CalendarView({
             ))}
           </View>
 
-          {/* Day columns */}
-          {dates.map((d, idx) => (
-            <View
-              key={d.toISOString()}
-              style={[styles.column, { width: columnWidth }]}
-            >
-              {hours.slice(0, -1).map((h) => (
-                <View
-                  key={h}
-                  style={[styles.hourCell, { height: HOUR_HEIGHT }]}
-                >
-                  {onPressTime
-                    ? [0, 15, 30, 45].map((m) => (
-                        <Pressable
-                          key={m}
-                          onPress={() => {
-                            const date = new Date(d);
-                            date.setHours(h, m, 0, 0);
-                            onPressTime(date);
-                          }}
-                          style={{ flex: 1 }}
-                        />
-                      ))
-                    : null}
-                </View>
-              ))}
-              {eventsByDay[idx].map((ev) => (
-                <EventBlock key={ev.id} event={ev} columnWidth={columnWidth} />
-              ))}
-            </View>
-          ))}
+          {/* Day columns: grid lines first, then a full-column Pressable
+              that derives the 15-min slot from the tap's Y position
+              (so tapping ON an event still surfaces "who's busy"),
+              then the selection highlight, then events (non-interactive). */}
+          {dates.map((d, idx) => {
+            const slotForY = (y) => {
+              const minuteOffset = (y / HOUR_HEIGHT) * 60;
+              const rawMinutes = DAY_START * 60 + minuteOffset;
+              const snapped = Math.max(
+                DAY_START * 60,
+                Math.min(DAY_END * 60 - 15, Math.round(rawMinutes / 15) * 15)
+              );
+              const date = new Date(d);
+              date.setHours(Math.floor(snapped / 60), snapped % 60, 0, 0);
+              return date;
+            };
+
+            const selectionForColumn =
+              selectedAt && isSameDay(selectedAt, d) ? selectedAt : null;
+
+            return (
+              <View
+                key={d.toISOString()}
+                style={[styles.column, { width: columnWidth }]}
+              >
+                {hours.slice(0, -1).map((h) => (
+                  <View
+                    key={h}
+                    style={[styles.hourCell, { height: HOUR_HEIGHT }]}
+                  />
+                ))}
+
+                {onPressTime ? (
+                  <Pressable
+                    style={StyleSheet.absoluteFill}
+                    onPress={(e) => onPressTime(slotForY(e.nativeEvent.locationY))}
+                  />
+                ) : null}
+
+                <SelectionHighlight
+                  selectedAt={selectionForColumn}
+                  columnWidth={columnWidth}
+                />
+
+                {eventsByDay[idx].map((ev) => (
+                  <EventBlock key={ev.id} event={ev} columnWidth={columnWidth} />
+                ))}
+              </View>
+            );
+          })}
 
           {/* Now-line overlay (only if a visible column is today) */}
           {dates.map((d, idx) =>
@@ -295,6 +343,14 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 6,
     overflow: 'hidden',
+  },
+  selection: {
+    position: 'absolute',
+    backgroundColor: colors.coral + '55',
+    borderColor: colors.coral,
+    borderWidth: 2,
+    borderRadius: 6,
+    zIndex: 5,
   },
   eventTitle: { ...typography.small, fontWeight: '700' },
   eventMeta: { ...typography.small, color: colors.textMuted, fontSize: 10 },

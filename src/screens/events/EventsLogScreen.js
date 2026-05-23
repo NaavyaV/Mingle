@@ -7,6 +7,7 @@ import Header from '../../components/Header';
 import EmptyState from '../../components/EmptyState';
 import FAB from '../../components/FAB';
 import EventListItem from '../../components/events/EventListItem';
+import PatternBackground from '../../components/PatternBackground';
 
 import { api } from '../../api/client';
 import { useUser } from '../../context/UserContext';
@@ -64,6 +65,7 @@ export default function EventsLogScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PatternBackground />
       <Header title="Events" subtitle="Happening on campus" />
 
       <FlatList

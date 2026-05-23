@@ -6,7 +6,7 @@ import {
   StyleSheet,
   Pressable,
   ScrollView,
-} from 'react-native';
+} from 'react-native'; // Pressable still used by close button
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -41,16 +41,39 @@ export default function UserCardSheet({
 }) {
   const insets = useSafeAreaInsets();
   const slide = useRef(new Animated.Value(0)).current;
+  const prevUsername = useRef(null);
 
   useEffect(() => {
+    const targetUsername = user?.username || null;
+    const prev = prevUsername.current;
+    prevUsername.current = targetUsername;
+
+    if (!targetUsername) {
+      Animated.spring(slide, {
+        toValue: 0,
+        useNativeDriver: true,
+        damping: 16,
+        stiffness: 180,
+        mass: 0.7,
+      }).start();
+      return;
+    }
+
+    // If we're swapping from user A to user B while the sheet is
+    // already up, briefly dip the slide so there's a visible pop on
+    // the new content. Fresh opens animate straight from 0 → 1.
+    if (prev && prev !== targetUsername) {
+      slide.setValue(0.85);
+    }
+
     Animated.spring(slide, {
-      toValue: user ? 1 : 0,
+      toValue: 1,
       useNativeDriver: true,
       damping: 16,
       stiffness: 180,
       mass: 0.7,
     }).start();
-  }, [user, slide]);
+  }, [user?.username, slide]);
 
   if (!user) return null;
 
@@ -61,7 +84,9 @@ export default function UserCardSheet({
       pointerEvents="box-none"
       style={[StyleSheet.absoluteFillObject, styles.layer]}
     >
-      <Pressable style={styles.scrim} onPress={onClose} />
+      {/* No scrim: we want touches outside the sheet to reach the map
+          underneath so tapping another pin (or empty map → onPress)
+          can switch / dismiss the sheet. */}
 
       <Animated.View
         style={[
@@ -126,15 +151,15 @@ export default function UserCardSheet({
           <View style={styles.actions}>
             <View style={{ flex: 1 }}>
               <Button
-                title={isFriend ? 'Friends' : 'Add friend'}
+                title={isFriend ? 'Unfriend' : 'Add friend'}
                 variant={isFriend ? 'outline' : 'primary'}
                 onPress={onFriend}
                 loading={busy}
                 leading={
                   <Ionicons
-                    name={isFriend ? 'checkmark' : 'person-add'}
+                    name={isFriend ? 'person-remove' : 'person-add'}
                     size={16}
-                    color={isFriend ? colors.primary : '#fff'}
+                    color={isFriend ? colors.danger : '#fff'}
                   />
                 }
               />
@@ -200,8 +225,9 @@ function PresenceBlock({ presence, status }) {
 }
 
 const styles = StyleSheet.create({
-  layer: { justifyContent: 'flex-end' },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'transparent' },
+  // zIndex + elevation make sure the sheet renders above the native
+  // MapView surface (on iOS the map can otherwise hover over RN siblings).
+  layer: { justifyContent: 'flex-end', zIndex: 50, elevation: 50 },
   sheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.xl,

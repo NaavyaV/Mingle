@@ -9,6 +9,7 @@ import IconButton from '../../components/IconButton';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import GoingRow from '../../components/events/GoingRow';
+import PatternBackground from '../../components/PatternBackground';
 
 import { api } from '../../api/client';
 import { useUser } from '../../context/UserContext';
@@ -49,6 +50,7 @@ export default function EventDetailScreen({ navigation, route }) {
   if (!event) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
+        <PatternBackground />
         <Header
           title="Event"
           left={
@@ -91,6 +93,7 @@ export default function EventDetailScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PatternBackground />
       <Header
         title="Event"
         left={

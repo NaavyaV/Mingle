@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -11,11 +11,12 @@ import CalendarView from '../../components/CalendarView';
 import CalendarRangeBar, { buildRange } from '../../components/CalendarRangeBar';
 import AvatarStack from '../../components/AvatarStack';
 import Card from '../../components/Card';
+import PatternBackground from '../../components/PatternBackground';
 
 import { api } from '../../api/client';
 import { useUser } from '../../context/UserContext';
 import { buildOverlapSchedule } from '../../utils/overlap';
-import { formatTimeShort } from '../../utils/format';
+import { formatTimeShort, formatDayLabel } from '../../utils/format';
 import { colors, spacing, typography } from '../../theme';
 
 export default function FriendsOverlapScreen({ navigation, route }) {
@@ -75,9 +76,11 @@ export default function FriendsOverlapScreen({ navigation, route }) {
 
   const bookedNow = tappedAt ? overlap.bookedAt(tappedAt) : [];
   const bookedUsers = bookedNow.map((u) => usersByUsername[u]).filter(Boolean);
+  const iAmBusy = tappedAt ? overlap.meBusyAt(tappedAt) : false;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PatternBackground />
       <Header
         title="Friends calendar"
         subtitle={
@@ -101,7 +104,12 @@ export default function FriendsOverlapScreen({ navigation, route }) {
         }
       />
 
-      <View style={styles.content}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <CalendarRangeBar mode={mode} onChangeMode={setMode} anchor={anchor} />
 
         <View style={styles.calendarWrap}>
@@ -111,6 +119,7 @@ export default function FriendsOverlapScreen({ navigation, route }) {
             columnWidth={columnWidth}
             maxHeight={360}
             onPressTime={setTappedAt}
+            selectedAt={tappedAt}
           />
         </View>
 
@@ -127,35 +136,37 @@ export default function FriendsOverlapScreen({ navigation, route }) {
             <View style={styles.bookedHeader}>
               <Ionicons name="time-outline" size={16} color={colors.primary} />
               <Text style={styles.bookedTitle}>
-                {formatTimeShort(tappedAt)} –{' '}
+                {formatDayLabel(tappedAt)}, {formatTimeShort(tappedAt)} –{' '}
                 {formatTimeShort(new Date(tappedAt.getTime() + 15 * 60000))}
               </Text>
             </View>
             {bookedUsers.length === 0 ? (
-              <Text style={styles.bookedEmpty}>Everyone you picked is free 🎉</Text>
+              <Text style={styles.bookedEmpty}>
+                {iAmBusy
+                  ? "Your friends are free — but you're booked."
+                  : 'Everyone you picked is free 🎉'}
+              </Text>
             ) : (
               <View style={styles.bookedRow}>
                 <AvatarStack users={bookedUsers} max={4} size={28} />
                 <Text style={styles.bookedNames} numberOfLines={2}>
                   {bookedUsers
                     .map((u) => u.name?.split(' ')[0] || u.username)
-                    .join(', ')}{' '}
-                  booked
+                    .join(', ')}
+                  {iAmBusy ? ', and you' : ''} booked
                 </Text>
               </View>
             )}
           </Card>
         ) : null}
 
-        <View style={{ marginTop: 'auto' }}>
-          <Button
-            title="My Friends"
-            variant="primary"
-            leading={<Ionicons name="people" size={18} color="#fff" />}
-            onPress={() => navigation.navigate('MyFriends')}
-          />
-        </View>
-      </View>
+        <Button
+          title="My Friends"
+          variant="primary"
+          leading={<Ionicons name="people" size={18} color="#fff" />}
+          onPress={() => navigation.navigate('MyFriends')}
+        />
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -172,9 +183,8 @@ function LegendDot({ color, label }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   content: {
-    flex: 1,
     paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.xl,
     gap: spacing.sm,
   },
   calendarWrap: { borderRadius: 12 },

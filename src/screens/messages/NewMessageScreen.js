@@ -7,6 +7,7 @@ import IconButton from '../../components/IconButton';
 import SearchBar from '../../components/SearchBar';
 import FriendRow from '../../components/friends/FriendRow';
 import EmptyState from '../../components/EmptyState';
+import PatternBackground from '../../components/PatternBackground';
 
 import { api } from '../../api/client';
 import { useUser } from '../../context/UserContext';
@@ -53,6 +54,7 @@ export default function NewMessageScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PatternBackground />
       <Header
         title="New message"
         left={

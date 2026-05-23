@@ -4,6 +4,8 @@ import {
   Text,
   StyleSheet,
   Alert,
+  ActionSheetIOS,
+  Platform,
   ScrollView,
   Keyboard,
   Pressable,
@@ -16,6 +18,7 @@ import Avatar from '../../components/Avatar/Avatar';
 import SpeechBubble from '../../components/SpeechBubble';
 import Button from '../../components/Button';
 import AvatarBuilder from '../../components/Avatar/AvatarBuilder';
+import PatternBackground from '../../components/PatternBackground';
 
 import { api } from '../../api/client';
 import { useUser } from '../../context/UserContext';
@@ -92,11 +95,37 @@ export default function ProfileScreen({ navigation }) {
     );
   };
 
+  // Settings (gear) menu — both account-level actions live here so the
+  // profile body stays clean.
+  const openSettings = () => {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: 'Account',
+          options: ['Cancel', 'Sign out', 'Delete account'],
+          cancelButtonIndex: 0,
+          destructiveButtonIndex: 2,
+        },
+        (idx) => {
+          if (idx === 1) onSignOut();
+          else if (idx === 2) onDelete();
+        }
+      );
+      return;
+    }
+    Alert.alert('Account', undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign out', onPress: onSignOut },
+      { text: 'Delete account', style: 'destructive', onPress: onDelete },
+    ]);
+  };
+
   // -------- EDIT MODE: one ScrollView that owns the whole screen so
   // scrolling works in every cell (avatar preview, swatches, chips, etc.)
   if (editing) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
+        <PatternBackground />
         <Header
           title="Edit profile"
           left={
@@ -150,6 +179,7 @@ export default function ProfileScreen({ navigation }) {
   // -------- VIEW MODE
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PatternBackground />
       <Header
         title=""
         left={
@@ -164,7 +194,7 @@ export default function ProfileScreen({ navigation }) {
           <IconButton
             icon="settings-outline"
             variant="ghost"
-            onPress={onSignOut}
+            onPress={openSettings}
             accessibilityLabel="Settings"
           />
         }
@@ -179,19 +209,26 @@ export default function ProfileScreen({ navigation }) {
           </View>
 
           <View style={styles.previewRow}>
-            <View style={styles.avatarSlot}>
-              <Avatar config={avatar} size={260} mode="full" />
-            </View>
-            <View style={styles.bubbleSlot} pointerEvents="box-none">
-              <SpeechBubble
-                value={status}
-                onChangeText={handleStatusChange}
-                tailSide="left"
-                placeholder="studying rn"
-              />
-              <Text style={styles.statusHint}>
-                {saving ? 'Saving…' : 'auto-saves as you type'}
-              </Text>
+            {/* Stage = the avatar+bubble unit as one fixed-size frame.
+                Avatar SVG is 138 wide and lives at left:0; bubble has
+                a fixed width and lives at a fixed offset; the stage's
+                total width is the union of both extents. Centering the
+                stage in `previewRow` therefore centers the whole unit
+                on-screen, regardless of what the user has typed. */}
+            <View style={styles.stage}>
+              <View style={styles.avatarSlot}>
+                <Avatar config={avatar} size={220} mode="full" />
+              </View>
+              <View style={styles.bubbleSlot} pointerEvents="box-none">
+                <SpeechBubble
+                  value={status}
+                  onChangeText={handleStatusChange}
+                  tailSide="left"
+                  placeholder="studying rn"
+                  maxLength={80}
+                  maxContentWidth={130}
+                />
+              </View>
             </View>
           </View>
 
@@ -202,9 +239,6 @@ export default function ProfileScreen({ navigation }) {
               variant="primary"
             />
             <Button title="Sign out" variant="outline" onPress={onSignOut} />
-            <Pressable onPress={onDelete} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
-              <Text style={styles.deleteText}>Delete account</Text>
-            </Pressable>
           </View>
         </View>
       </Pressable>
@@ -230,30 +264,32 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
   },
-  avatarSlot: { alignItems: 'center', justifyContent: 'center' },
+  // Stage spans the avatar + the bubble's full extent so centering
+  // the stage horizontally centers the whole unit. Width breakdown:
+  //   avatar SVG (138) — at left:0
+  //   bubble    (170)  — at left:88   ⇒ right edge at 258
+  stage: {
+    width: 258,
+    height: 220,
+  },
+  avatarSlot: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
   bubbleSlot: {
     position: 'absolute',
-    right: spacing.xs,
-    top: 40,
-    maxWidth: 200,
-    alignItems: 'flex-start',
-    gap: 4,
-  },
-  statusHint: {
-    ...typography.small,
-    color: colors.textMuted,
-    marginLeft: 14,
+    // x: avatar's head right edge sits at viewBox x≈130 → 130/200×138 ≈ 90px,
+    //    so anchoring at 88 lands the tail tip right at the cheek.
+    // y: bubble's tail is fixed at 23px from its top (see SpeechBubble),
+    //    and the mouth is at viewBox y=86 → 86/320×220 ≈ 59 → top 36
+    //    + 23 = 59 ≈ mouth.
+    left: 88,
+    top: 36,
   },
 
   actions: { gap: spacing.sm },
-  deleteText: {
-    ...typography.caption,
-    color: colors.danger,
-    textAlign: 'center',
-    paddingVertical: spacing.sm,
-  },
 
   // edit mode
   editContent: {

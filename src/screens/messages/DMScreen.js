@@ -18,14 +18,17 @@ import Avatar from '../../components/Avatar/Avatar';
 import ChatBubble from '../../components/messages/ChatBubble';
 import EventInviteCard from '../../components/messages/EventInviteCard';
 import EmptyState from '../../components/EmptyState';
+import PatternBackground from '../../components/PatternBackground';
 
 import { api } from '../../api/client';
 import { useUser } from '../../context/UserContext';
+import { useUnread } from '../../context/UnreadContext';
 import { colors, radius, spacing, typography } from '../../theme';
 import { formatTimeShort } from '../../utils/format';
 
 export default function DMScreen({ route, navigation }) {
   const { user } = useUser();
+  const { refresh: refreshUnread } = useUnread();
   const { other, otherUser: paramUser } = route.params || {};
   const [otherUser, setOtherUser] = useState(paramUser || null);
   const [messages, setMessages] = useState([]);
@@ -57,10 +60,15 @@ export default function DMScreen({ route, navigation }) {
         for (const e of fetched) if (e) next[e._id] = e;
         setEventsById(next);
       }
+
+      // getThread on the server already marks messages from `other` as
+      // read for `me`; tell the unread provider to refresh so the tab
+      // badge updates immediately instead of waiting for the next poll.
+      refreshUnread();
     } catch {
       /* ignore */
     }
-  }, [user?.username, other, otherUser]);
+  }, [user?.username, other, otherUser, refreshUnread]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
   useEffect(() => { load(); }, [load]);
@@ -109,6 +117,7 @@ export default function DMScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PatternBackground />
       <Header
         title={otherUser?.name || other || 'Chat'}
         subtitle={otherUser?.username ? `@${otherUser.username}` : ''}

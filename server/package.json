@@ -12,6 +12,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "mongoose": "^8.8.2"
+    "ical-expander": "^3.2.0",
+    "mongoose": "^8.8.2",
+    "node-ical": "^0.26.1"
   }
 }
