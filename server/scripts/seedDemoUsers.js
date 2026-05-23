@@ -400,34 +400,40 @@ function buildEvents(personas) {
   today.setHours(0, 0, 0, 0);
   const out = [];
 
-  for (let i = 0; i < EVENT_TEMPLATES.length; i += 1) {
-    const t = EVENT_TEMPLATES[i];
-    const start = new Date(today);
-    start.setDate(today.getDate() + t.dayOffset);
-    start.setHours(t.hour, t.minute, 0, 0);
-    const end = new Date(start);
-    end.setHours(end.getHours() + Math.floor(t.durationHr));
-    end.setMinutes(end.getMinutes() + Math.round((t.durationHr % 1) * 60));
+  // Generate each template twice — wave 0 lands in the original
+  // dayOffset (0-7 days out) and wave 1 is shifted +7 days. This
+  // guarantees the events list still has plenty of upcoming entries
+  // for ~2 weeks after seeding, even if the demo sits idle.
+  const WAVES = 2;
+  for (let wave = 0; wave < WAVES; wave += 1) {
+    for (let i = 0; i < EVENT_TEMPLATES.length; i += 1) {
+      const t = EVENT_TEMPLATES[i];
+      const start = new Date(today);
+      start.setDate(today.getDate() + t.dayOffset + wave * 7);
+      start.setHours(t.hour, t.minute, 0, 0);
+      const end = new Date(start);
+      end.setHours(end.getHours() + Math.floor(t.durationHr));
+      end.setMinutes(end.getMinutes() + Math.round((t.durationHr % 1) * 60));
 
-    const host = personas[Math.floor(RNG() * personas.length)].username;
-    // Pick `goingTarget` random attendees (always include host).
-    const attendees = new Set([host]);
-    const target = Math.min(t.goingTarget, personas.length);
-    let safety = target * 4;
-    while (attendees.size < target && safety > 0) {
-      attendees.add(personas[Math.floor(RNG() * personas.length)].username);
-      safety -= 1;
+      const host = personas[Math.floor(RNG() * personas.length)].username;
+      const attendees = new Set([host]);
+      const target = Math.min(t.goingTarget, personas.length);
+      let safety = target * 4;
+      while (attendees.size < target && safety > 0) {
+        attendees.add(personas[Math.floor(RNG() * personas.length)].username);
+        safety -= 1;
+      }
+
+      out.push({
+        name: wave === 0 ? t.name : `${t.name} (wk 2)`,
+        description: t.description,
+        location: t.location,
+        startAt: start,
+        endAt: end,
+        host,
+        going: Array.from(attendees),
+      });
     }
-
-    out.push({
-      name: t.name,
-      description: t.description,
-      location: t.location,
-      startAt: start,
-      endAt: end,
-      host,
-      going: Array.from(attendees),
-    });
   }
 
   return out;

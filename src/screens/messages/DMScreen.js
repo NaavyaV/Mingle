@@ -93,6 +93,20 @@ export default function DMScreen({ route, navigation }) {
     }
   };
 
+  const handleBack = () => {
+    const state = navigation.getState();
+    if (state?.index > 0) {
+      navigation.goBack();
+      return;
+    }
+
+    // When a DM is opened directly from another tab's profile sheet,
+    // the Messages stack can contain only DM. In that case, a plain
+    // goBack returns to the originating tab, so route explicitly to the
+    // messages list instead.
+    navigation.replace('MessagesList');
+  };
+
   const renderItem = ({ item }) => {
     const mine = item.from === user?.username;
     if (item.kind === 'eventInvite') {
@@ -125,7 +139,7 @@ export default function DMScreen({ route, navigation }) {
           <IconButton
             icon="chevron-back"
             variant="ghost"
-            onPress={() => navigation.goBack()}
+            onPress={handleBack}
             accessibilityLabel="Back"
           />
         }

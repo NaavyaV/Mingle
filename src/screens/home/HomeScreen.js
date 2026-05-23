@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,11 +8,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AvatarButton from '../../components/AvatarButton';
 import UserPin from '../../components/map/UserPin';
 import UserCardSheet from '../../components/map/UserCardSheet';
+import MapSuggestionTooltip from '../../components/map/MapSuggestionTooltip';
 
 import { api } from '../../api/client';
 import { useUser } from '../../context/UserContext';
 import { inferPresence, getPresenceDetail } from '../../utils/presence';
 import { DEFAULT_CAMPUS, deterministicLocation } from '../../utils/geo';
+import { pickMapSuggestion } from '../../utils/suggestions';
 import { colors, spacing } from '../../theme';
 
 // How often we re-fetch the user list while the map is foregrounded.
@@ -45,6 +47,15 @@ export default function HomeScreen({ navigation }) {
   // care about the deltas (zoom level), so we keep this minimal to
   // avoid spamming re-renders on every pan.
   const [region, setRegion] = useState(null);
+  // Seed for the suggestion tooltip. Initialized once per HomeScreen
+  // mount ("once per app load" in practice, since the map tab stays
+  // mounted), and bumped manually by the refresh button.
+  const [tipSeed, setTipSeed] = useState(() => Math.floor(Math.random() * 1e6));
+  // The currently displayed suggestion. Populated asynchronously
+  // (Gemini call) or via the local fallback if the server is down
+  // or the AI request fails. `loading` toggles the tooltip skeleton.
+  const [tip, setTip] = useState(null);
+  const [tipLoading, setTipLoading] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -218,6 +229,91 @@ export default function HomeScreen({ navigation }) {
     setSelectedUsername(null);
   }, []);
 
+  // Compute the rules-based local suggestion. Used as the safety net
+  // when Gemini is unreachable / returns an error, and as the data
+  // the AI prompt indirectly depends on for "freshness" (changing
+  // `users`/`friends` invalidates the cached AI tip too).
+  const localTip = useMemo(() => {
+    if (!user?.username) return null;
+    const friendSet = new Set(friends || []);
+    const friendObjs = users.filter((u) => friendSet.has(u.username));
+    const myInterests = new Set(
+      (user.interests || []).map((s) => String(s).toLowerCase())
+    );
+    const recommendedObjs =
+      myInterests.size === 0
+        ? []
+        : users.filter(
+            (u) =>
+              u.username !== user.username &&
+              !friendSet.has(u.username) &&
+              (u.interests || []).some((i) =>
+                myInterests.has(String(i).toLowerCase())
+              )
+          );
+    return pickMapSuggestion({
+      me: user,
+      friends: friendObjs,
+      recommended: recommendedObjs,
+      seed: tipSeed,
+      now: new Date(),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, users, friends, tipSeed, nowTick]);
+
+  // AI-powered tip. We fire one request per (username, tipSeed) — so
+  // once on app load, and again every time the user taps refresh.
+  // The request is racey-cancellation-safe: if `tipSeed` bumps mid-
+  // flight, the stale resolver just no-ops because `cancelled` flips.
+  useEffect(() => {
+    if (!user?.username) return undefined;
+    let cancelled = false;
+    setTipLoading(true);
+    api
+      .getAiSuggestion(user.username, tipSeed)
+      .then((res) => {
+        if (cancelled) return;
+        if (res?.text) {
+          const tokens = res?.meta?.tokens;
+          console.log(
+            `[suggestions] tip from ${res.model || 'gemini'}` +
+              (tokens
+                ? ` (in/out=${tokens.prompt}/${tokens.output})`
+                : '')
+          );
+          setTip({ text: res.text, source: res.source || 'gemini' });
+        } else {
+          throw new Error('empty AI response');
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        // Server already logged the underlying error in its terminal
+        // ("[suggestions/map] gemini call failed for …"). Log a brief
+        // breadcrumb here too so the dev catches it in Metro logs.
+        console.log(
+          '[suggestions] AI tip unavailable, falling back to local:',
+          err?.message || err
+        );
+        setTip(localTip);
+      })
+      .finally(() => {
+        if (!cancelled) setTipLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // We intentionally do NOT depend on `localTip` so a friends-list
+    // poll mid-flight doesn't trigger a new Gemini call. The fallback
+    // closure captures the latest localTip via setState when needed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.username, tipSeed]);
+
+  // While we wait for the very first AI response, show the local tip
+  // so the tooltip isn't empty. Once `tip` is set, we keep showing it
+  // until the next refresh (loading spinner overlays via tipLoading).
+  const displayTip = tip || localTip;
+
   // Find the viewer's own pin and decide whether it's currently in
   // view. If not, the "find me" FAB is shown bottom-left.
   const myPin = pins.find((p) => p.isMe) || null;
@@ -315,6 +411,22 @@ export default function HomeScreen({ navigation }) {
         />
       </View>
 
+      {/* Suggestion tooltip. Fills the empty space to the left of
+          the profile FAB and extends downward — one AI-generated tip
+          per app load, refresh icon kicks off a new Gemini call. */}
+      {displayTip || tipLoading ? (
+        <View
+          pointerEvents="box-none"
+          style={[styles.tipSlot, { top: insets.top + 8 }]}
+        >
+          <MapSuggestionTooltip
+            tip={displayTip}
+            loading={tipLoading}
+            onRefresh={() => setTipSeed((s) => s + 1)}
+          />
+        </View>
+      ) : null}
+
       {/* "Find me" FAB. Appears bottom-left whenever the viewer's
           own avatar has been panned off-screen; recenters the map
           on their pin. */}
@@ -353,6 +465,15 @@ const styles = StyleSheet.create({
     right: spacing.lg,
     zIndex: 40,
     elevation: 40,
+  },
+  tipSlot: {
+    position: 'absolute',
+    left: spacing.lg,
+    // Leave room for the 52px profile FAB at right: spacing.lg with
+    // an 8px gutter between the two.
+    right: spacing.lg + 52 + 8,
+    zIndex: 30,
+    elevation: 30,
   },
   loader: {
     position: 'absolute',

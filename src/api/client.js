@@ -110,4 +110,16 @@ export const api = {
     }),
   syncCalendar: (userId) =>
     request(`/api/calendar/users/${userId}/sync`, { method: 'POST' }),
+
+  // AI map tooltip suggestions (Gemini). `getAiSuggestion` is the
+  // name used by HomeScreen; `getMapSuggestion` is kept as an alias.
+  getAiSuggestion: (username, seed, signal) =>
+    request('/api/suggestions/map', {
+      method: 'POST',
+      body: { username, seed },
+      signal,
+    }),
+  getMapSuggestion(username, seed, signal) {
+    return this.getAiSuggestion(username, seed, signal);
+  },
 };

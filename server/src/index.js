@@ -7,6 +7,7 @@ const friendsRouter = require('./routes/friends');
 const messagesRouter = require('./routes/messages');
 const eventsRouter = require('./routes/events');
 const calendarRouter = require('./routes/calendar');
+const suggestionsRouter = require('./routes/suggestions');
 
 const PORT = Number(process.env.PORT || 4000);
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -28,6 +29,7 @@ app.use('/api/friends', friendsRouter);
 app.use('/api/messages', messagesRouter);
 app.use('/api/events', eventsRouter);
 app.use('/api/calendar', calendarRouter);
+app.use('/api/suggestions', suggestionsRouter);
 
 app.use((err, _req, res, _next) => {
   console.error('[error]', err);
