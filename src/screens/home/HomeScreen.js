@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -35,8 +36,15 @@ export default function HomeScreen({ navigation }) {
   // after a marker selection — that ghost was instantly closing the
   // sheet, making pins feel like they "randomly" worked.
   const lastMarkerTapAt = useRef(0);
+  // Imperative handle for the MapView so the "find me" FAB can animate
+  // the camera back to the viewer's pin.
+  const mapRef = useRef(null);
   // Bumps every minute so memoized presence strings recompute.
   const [nowTick, setNowTick] = useState(0);
+  // Tracks the visible map region so we can cluster bubbles. We only
+  // care about the deltas (zoom level), so we keep this minimal to
+  // avoid spamming re-renders on every pan.
+  const [region, setRegion] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -78,9 +86,16 @@ export default function HomeScreen({ navigation }) {
       ? deterministicLocation(meUsername, DEFAULT_CAMPUS, 0.0005)
       : DEFAULT_CAMPUS;
 
-    return (users || []).map((u) => {
+    const base = (users || []).map((u) => {
       const isMe = u.username === meUsername;
-      const coord = isMe ? myCoord : deterministicLocation(u.username);
+      // Prefer a fixed homeLocation (set by demo seed) over the
+      // deterministic scatter so personas land on real buildings.
+      const fixed = u?.homeLocation;
+      const coord = isMe
+        ? myCoord
+        : fixed && typeof fixed.latitude === 'number' && typeof fixed.longitude === 'number'
+        ? { latitude: fixed.latitude, longitude: fixed.longitude }
+        : deterministicLocation(u.username);
       return {
         key: u.username,
         coord,
@@ -89,10 +104,57 @@ export default function HomeScreen({ navigation }) {
         status: inferPresence(u),
       };
     });
+
+    // Bubble + name-tag clustering. With 50+ pins on screen at once
+    // both the status bubbles and the name tags overlap into an
+    // unreadable blob. We bucket pins into two independent grids:
+    //   • a coarse grid for status bubbles (one per ~viewport/5)
+    //   • a finer  grid for name tags     (one per ~viewport/10)
+    // so name tags appear earlier than status bubbles as you zoom in.
+    // Within each cell, the viewer's own pin always wins; then friends,
+    // then others (alphabetical username tiebreak for stability).
+    //
+    // Fall back to the same delta we use for initialRegion below
+    // (0.012) until the map reports its first region.
+    const dLat = region?.latitudeDelta || 0.012;
+    const dLng = region?.longitudeDelta || 0.012;
+    const friendSet = new Set(friends || []);
+    const score = (p) => (p.isMe ? 2 : friendSet.has(p.key) ? 1 : 0);
+
+    const buildWinners = (gridN) => {
+      const cellLat = dLat / gridN;
+      const cellLng = dLng / gridN;
+      const winners = new Map();
+      const cellOf = (p) =>
+        `${Math.floor(p.coord.latitude / cellLat)}:${Math.floor(p.coord.longitude / cellLng)}`;
+      for (const p of base) {
+        const k = cellOf(p);
+        const prev = winners.get(k);
+        if (
+          !prev ||
+          score(p) > score(prev) ||
+          (score(p) === score(prev) && p.key < prev.key)
+        ) {
+          winners.set(k, p);
+        }
+      }
+      return (p) => winners.get(cellOf(p)) === p;
+    };
+
+    const isBubbleWinner = buildWinners(5);
+    const isNameWinner = buildWinners(10);
+
+    return base.map((p) => ({
+      ...p,
+      // The viewer's own pin always shows both label and bubble so
+      // they can always spot themselves in the cluster.
+      showStatus: p.isMe || isBubbleWinner(p),
+      showName: p.isMe || isNameWinner(p),
+    }));
     // nowTick included so the per-minute status text updates without
     // needing the server payload to change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [users, user?.username, nowTick]);
+  }, [users, user?.username, nowTick, region, friends]);
 
   const initialRegion = useMemo(
     () => ({
@@ -156,18 +218,52 @@ export default function HomeScreen({ navigation }) {
     setSelectedUsername(null);
   }, []);
 
+  // Find the viewer's own pin and decide whether it's currently in
+  // view. If not, the "find me" FAB is shown bottom-left.
+  const myPin = pins.find((p) => p.isMe) || null;
+  const meOffScreen = useMemo(() => {
+    if (!myPin || !region) return false;
+    const halfLat = region.latitudeDelta / 2;
+    const halfLng = region.longitudeDelta / 2;
+    const { latitude, longitude } = myPin.coord;
+    return (
+      latitude < region.latitude - halfLat ||
+      latitude > region.latitude + halfLat ||
+      longitude < region.longitude - halfLng ||
+      longitude > region.longitude + halfLng
+    );
+  }, [myPin, region]);
+
+  const flyToMe = useCallback(() => {
+    if (!myPin || !mapRef.current) return;
+    mapRef.current.animateToRegion(
+      {
+        latitude: myPin.coord.latitude,
+        longitude: myPin.coord.longitude,
+        latitudeDelta: 0.006,
+        longitudeDelta: 0.006,
+      },
+      450
+    );
+  }, [myPin]);
+
   const handleMessage = () => {
     if (!selected || selectedIsMe) return;
     setSelectedUsername(null);
+    // initial: false makes React Navigation lay the stack out as
+    // [MessagesList, DM] so the back button in DM returns to the
+    // user's conversation list (not the screen they came from).
     navigation.getParent()?.navigate('MessagesTab', {
       screen: 'DM',
       params: { other: selected.username },
+      initial: false,
     });
   };
 
   return (
     <View style={styles.wrap}>
       <MapView
+        ref={mapRef}
         provider={PROVIDER_DEFAULT}
         style={StyleSheet.absoluteFillObject}
         initialRegion={initialRegion}
@@ -177,18 +273,29 @@ export default function HomeScreen({ navigation }) {
         showsBuildings
         loadingEnabled
         onPress={handleMapPress}
+        onRegionChangeComplete={setRegion}
       >
         {pins.map((p) => {
           const open = () => openPin(p.key);
+          // Including showStatus / showName in the key forces the
+          // native marker to re-rasterize when label visibility flips
+          // (otherwise react-native-maps caches the original render).
           return (
             <Marker
-              key={p.key}
+              key={`${p.key}-${p.showStatus ? 'b' : 'n'}-${p.showName ? 'l' : 'h'}`}
               coordinate={p.coord}
               anchor={{ x: 0.5, y: 1 }}
               tracksViewChanges={false}
               onPress={open}
             >
-              <UserPin user={p.user} status={p.status} isMe={p.isMe} onPress={open} />
+              <UserPin
+                user={p.user}
+                status={p.status}
+                isMe={p.isMe}
+                showStatus={p.showStatus}
+                showName={p.showName}
+                onPress={open}
+              />
             </Marker>
           );
         })}
@@ -207,6 +314,23 @@ export default function HomeScreen({ navigation }) {
           onPress={() => navigation.navigate('Profile')}
         />
       </View>
+
+      {/* "Find me" FAB. Appears bottom-left whenever the viewer's
+          own avatar has been panned off-screen; recenters the map
+          on their pin. */}
+      {meOffScreen ? (
+        <Pressable
+          onPress={flyToMe}
+          style={({ pressed }) => [
+            styles.findMeBtn,
+            { bottom: insets.bottom + 16 },
+            pressed && { opacity: 0.85 },
+          ]}
+          hitSlop={8}
+        >
+          <Ionicons name="navigate" size={18} color="#fff" />
+        </Pressable>
+      ) : null}
 
       <UserCardSheet
         user={selected}
@@ -236,5 +360,21 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 16,
     backgroundColor: colors.surface,
+  },
+  findMeBtn: {
+    position: 'absolute',
+    left: spacing.lg,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 40,
+    elevation: 40,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
   },
 });

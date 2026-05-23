@@ -65,6 +65,20 @@ const UserSchema = new Schema(
     },
     avatar: { type: AvatarSchema, default: null },
     status: { type: String, default: '' },
+    // Optional fixed map location (used by demo personas). Real users
+    // are scattered deterministically around the campus center by the
+    // client; if this is set, the client respects it.
+    homeLocation: {
+      type: new Schema(
+        {
+          latitude: Number,
+          longitude: Number,
+          label: String,
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
   },
   { timestamps: true }
 );

@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react';
 import {
   Animated,
+  Easing,
   View,
   Text,
   StyleSheet,
   Pressable,
   ScrollView,
-} from 'react-native'; // Pressable still used by close button
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -41,38 +42,47 @@ export default function UserCardSheet({
 }) {
   const insets = useSafeAreaInsets();
   const slide = useRef(new Animated.Value(0)).current;
-  const prevUsername = useRef(null);
+  const activeAnim = useRef(null);
 
+  // Open / close animation. We use timing (not spring) so:
+  //   • the sheet never overshoots its rest position (no flying above)
+  //   • every open starts from a clean slide=0 baseline, so the second,
+  //     third, ... open animations look identical to the first.
+  //
+  // Switching directly from user A → user B (without closing first) is
+  // a fresh open animation too — slide is forced to 0 then animates
+  // back to 1, giving a clear visual "pop" on the new content.
   useEffect(() => {
-    const targetUsername = user?.username || null;
-    const prev = prevUsername.current;
-    prevUsername.current = targetUsername;
+    if (activeAnim.current) {
+      activeAnim.current.stop();
+      activeAnim.current = null;
+    }
 
-    if (!targetUsername) {
-      Animated.spring(slide, {
+    if (!user) {
+      const anim = Animated.timing(slide, {
         toValue: 0,
+        duration: 220,
+        easing: Easing.in(Easing.cubic),
         useNativeDriver: true,
-        damping: 16,
-        stiffness: 180,
-        mass: 0.7,
-      }).start();
+      });
+      activeAnim.current = anim;
+      anim.start(() => {
+        activeAnim.current = null;
+      });
       return;
     }
 
-    // If we're swapping from user A to user B while the sheet is
-    // already up, briefly dip the slide so there's a visible pop on
-    // the new content. Fresh opens animate straight from 0 → 1.
-    if (prev && prev !== targetUsername) {
-      slide.setValue(0.85);
-    }
-
-    Animated.spring(slide, {
+    slide.setValue(0);
+    const anim = Animated.timing(slide, {
       toValue: 1,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
-      damping: 16,
-      stiffness: 180,
-      mass: 0.7,
-    }).start();
+    });
+    activeAnim.current = anim;
+    anim.start(() => {
+      activeAnim.current = null;
+    });
   }, [user?.username, slide]);
 
   if (!user) return null;
@@ -98,6 +108,7 @@ export default function UserCardSheet({
                 translateY: slide.interpolate({
                   inputRange: [0, 1],
                   outputRange: [400, 0],
+                  extrapolate: 'clamp',
                 }),
               },
             ],
@@ -202,23 +213,28 @@ function PresenceBlock({ presence, status }) {
   const isBusy = presence.kind === 'busy';
   const accent = isBusy ? colors.coral : colors.success;
 
+  // Headline reads "Busy for 35m" / "Free for 2h 15m" / "Free".
+  const headline = isBusy
+    ? `Busy for ${presence.remaining}`
+    : presence.remaining
+    ? `Free for ${presence.remaining}`
+    : 'Free';
+
   return (
     <View style={styles.presenceCard}>
       <View style={styles.presenceTop}>
         <View style={[styles.dot, { backgroundColor: accent }]} />
-        <Text style={[styles.presenceTitle, { color: accent }]}>
-          {isBusy ? presence.title : 'Free'}
-        </Text>
+        <Text style={[styles.presenceTitle, { color: accent }]}>{headline}</Text>
       </View>
-      <Text style={styles.presenceDetail}>
-        {isBusy
-          ? `${presence.remaining} left${presence.until ? ` · until ${presence.until}` : ''}${
-              presence.location ? ` · ${presence.location}` : ''
-            }`
-          : presence.until
-          ? `${presence.freeFor} free until ${presence.until} (${presence.nextLabel})`
-          : presence.freeFor || 'all day'}
-      </Text>
+      {isBusy && (presence.title || presence.location) ? (
+        <Text style={styles.presenceDetail}>
+          {presence.title}
+          {presence.location ? ` · ${presence.location}` : ''}
+        </Text>
+      ) : null}
+      {!isBusy && presence.nextLabel ? (
+        <Text style={styles.presenceDetail}>then {presence.nextLabel}</Text>
+      ) : null}
       {status ? <Text style={styles.statusLine}>“{status}”</Text> : null}
     </View>
   );

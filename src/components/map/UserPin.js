@@ -12,7 +12,14 @@ import { colors, radius, shadow, spacing, typography } from '../../theme';
  * a Pressable here and fire `onPress` from React Native directly. The
  * caller should pass the same handler it would have given Marker.
  */
-export default function UserPin({ user, status, isMe = false, onPress }) {
+export default function UserPin({
+  user,
+  status,
+  isMe = false,
+  onPress,
+  showStatus = true,
+  showName = true,
+}) {
   const name = isMe ? 'You' : user?.name?.split(' ')[0] || user?.username;
 
   return (
@@ -21,7 +28,7 @@ export default function UserPin({ user, status, isMe = false, onPress }) {
       hitSlop={8}
       style={({ pressed }) => [styles.wrap, pressed && { opacity: 0.85 }]}
     >
-      {status ? (
+      {showStatus && status ? (
         <View style={styles.statusBubble}>
           <Text
             numberOfLines={4}
@@ -32,14 +39,21 @@ export default function UserPin({ user, status, isMe = false, onPress }) {
           </Text>
         </View>
       ) : null}
+      {/* The viewer's own pin gets a coral ring + slightly larger
+          avatar so it pops out of dense clusters. */}
       <View style={[styles.avatarWrap, isMe && styles.avatarWrapMe]}>
-        <Avatar config={user?.avatar} size={48} mode="full" />
+        <Avatar config={user?.avatar} size={isMe ? 56 : 48} mode="full" />
       </View>
-      <View style={styles.nameTag}>
-        <Text style={styles.name} numberOfLines={1}>
-          {name}
-        </Text>
-      </View>
+      {showName ? (
+        <View style={[styles.nameTag, isMe && styles.nameTagMe]}>
+          <Text
+            style={[styles.name, isMe && styles.nameMe]}
+            numberOfLines={1}
+          >
+            {name}
+          </Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -67,9 +81,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   avatarWrapMe: {
-    borderBottomWidth: 3,
-    borderBottomColor: colors.coral,
-    paddingBottom: 1,
+    padding: 3,
+    borderRadius: 36,
+    backgroundColor: colors.coral + '22',
+    borderWidth: 2,
+    borderColor: colors.coral,
   },
   nameTag: {
     marginTop: 2,
@@ -79,10 +95,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     ...shadow.soft,
   },
+  nameTagMe: {
+    backgroundColor: colors.coral,
+    paddingHorizontal: 8,
+  },
   name: {
     ...typography.small,
     color: colors.text,
     fontWeight: '700',
     fontSize: 11,
   },
+  nameMe: { color: '#fff', fontSize: 12 },
 });

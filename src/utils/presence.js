@@ -1,13 +1,42 @@
 /**
  * Turns a user's schedule into a short "what are they doing right now"
- * status string for the map.
+ * status string for the map + the bottom-sheet profile card.
+ *
+ * Design notes:
+ *   - All-day events (anything spanning ≥ ~18 hours of a calendar day)
+ *     are ignored. We don't want "Mother's Day" or a multi-day trip to
+ *     paint someone as "Busy all day" — only timed events count.
+ *   - Free time is reported as a duration to the *next* timed event:
+ *     "Free for 2h 15m". When no upcoming event exists, we just say
+ *     "Free" with no duration.
+ *   - Busy time is reported as a duration until the current event
+ *     ends: "Busy for 35m". The event's title is preserved as the
+ *     human-friendly label for the bottom-sheet card.
  */
+
+const HOUR_MS = 3600 * 1000;
+const ALL_DAY_THRESHOLD_MS = 18 * HOUR_MS;
+
+function eventDurationMs(event) {
+  const start = new Date(event?.start?.dateTime).getTime();
+  const end = new Date(event?.end?.dateTime).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end)) return 0;
+  return Math.max(0, end - start);
+}
+
+function isAllDay(event) {
+  return eventDurationMs(event) >= ALL_DAY_THRESHOLD_MS;
+}
 
 function eventActiveAt(event, now) {
   const start = new Date(event?.start?.dateTime);
   const end = new Date(event?.end?.dateTime);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false;
   return start <= now && now < end;
+}
+
+function pickTimedEvents(events) {
+  return (events || []).filter((e) => !isAllDay(e));
 }
 
 function nextEventAfter(events, now) {
@@ -26,15 +55,8 @@ function minsLeft(event, now) {
   return Math.max(0, Math.round((end - now) / 60000));
 }
 
-function formatTime(date) {
-  const h = date.getHours();
-  const m = date.getMinutes();
-  const ampm = h >= 12 ? 'pm' : 'am';
-  const hh = ((h + 11) % 12) + 1;
-  return m === 0 ? `${hh}${ampm}` : `${hh}:${String(m).padStart(2, '0')}${ampm}`;
-}
-
 function formatDuration(mins) {
+  if (mins < 1) return '0m';
   if (mins < 60) return `${mins}m`;
   const h = Math.floor(mins / 60);
   const m = mins % 60;
@@ -42,47 +64,41 @@ function formatDuration(mins) {
 }
 
 /**
- * Best-effort short status for a user, e.g. "in class for 45m" or
- * "free until 4pm" or just their own status if nothing applies.
+ * Short single-line status for the map pin caption.
+ *   "Busy for 35m" / "Free for 2h" / "Free" / user's typed status / ''.
  */
 export function inferPresence(user, now = new Date()) {
-  const raw = user?.schedule?.items;
-  const events = Array.isArray(raw) ? raw : [];
+  const events = pickTimedEvents(user?.schedule?.items);
   const current = events.find((e) => eventActiveAt(e, now));
   if (current) {
-    const m = minsLeft(current, now);
-    const label = (current.summary || 'busy').toLowerCase();
-    if (m >= 60) return `${label} • ${Math.round(m / 60)}h left`;
-    return `${label} • ${m}m left`;
+    return `Busy for ${formatDuration(minsLeft(current, now))}`;
   }
-  if (user?.status) return user.status;
   const next = nextEventAfter(events, now);
   if (next) {
     const start = new Date(next.start.dateTime);
-    return `free until ${formatTime(start)}`;
+    const freeMins = Math.max(0, Math.round((start - now) / 60000));
+    return `Free for ${formatDuration(freeMins)}`;
   }
-  return 'free now';
+  if (user?.status) return user.status;
+  return 'Free';
 }
 
 /**
  * Structured version of `inferPresence` for the map's bottom-sheet
  * profile card. Returns:
- *   { kind: 'busy',  title, until, freeFor? }    // currently in event
- *   { kind: 'free',  title, until?, freeFor? }   // free now
- *   { kind: 'hidden' }                            // no calendar visibility
+ *   { kind: 'busy',  title, location?, remaining }  // in a timed event
+ *   { kind: 'free',  remaining? }                    // free with countdown
+ *   { kind: 'free' }                                 // free, nothing upcoming
  */
 export function getPresenceDetail(user, now = new Date()) {
-  const raw = user?.schedule?.items;
-  const events = Array.isArray(raw) ? raw : [];
+  const events = pickTimedEvents(user?.schedule?.items);
 
   const current = events.find((e) => eventActiveAt(e, now));
   if (current) {
-    const end = new Date(current.end.dateTime);
     return {
       kind: 'busy',
       title: current.summary || 'Busy',
       location: current.location,
-      until: formatTime(end),
       remaining: formatDuration(minsLeft(current, now)),
     };
   }
@@ -93,12 +109,10 @@ export function getPresenceDetail(user, now = new Date()) {
     const freeMins = Math.max(0, Math.round((start - now) / 60000));
     return {
       kind: 'free',
-      title: 'Free',
-      until: formatTime(start),
-      freeFor: formatDuration(freeMins),
+      remaining: formatDuration(freeMins),
       nextLabel: next.summary || 'next event',
     };
   }
 
-  return { kind: 'free', title: 'Free', freeFor: 'for the rest of the day' };
+  return { kind: 'free' };
 }
