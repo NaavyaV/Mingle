@@ -3,6 +3,9 @@ const express = require('express');
 const cors = require('cors');
 const { connectDb } = require('./db');
 const usersRouter = require('./routes/users');
+const friendsRouter = require('./routes/friends');
+const messagesRouter = require('./routes/messages');
+const eventsRouter = require('./routes/events');
 
 const PORT = Number(process.env.PORT || 4000);
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -20,6 +23,9 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/users', usersRouter);
+app.use('/api/friends', friendsRouter);
+app.use('/api/messages', messagesRouter);
+app.use('/api/events', eventsRouter);
 
 app.use((err, _req, res, _next) => {
   console.error('[error]', err);

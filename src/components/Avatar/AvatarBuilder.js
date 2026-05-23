@@ -27,8 +27,12 @@ function Section({ title, children }) {
  * is rendered by the caller so it can frame and position the character
  * however it wants — for example the onboarding step puts a status speech
  * bubble above the avatar.
+ *
+ * Pass `scrollable={false}` when this is mounted inside an outer
+ * ScrollView (Profile edit screen) so vertical drags propagate to the
+ * parent — nested ScrollViews on iOS swallow scroll gestures.
  */
-export default function AvatarBuilder({ value, onChange }) {
+export default function AvatarBuilder({ value, onChange, scrollable = true }) {
   const update = (patch) => onChange(ensureValidHair({ ...value, ...patch }));
 
   const handleGenderChange = (genderId) => {
@@ -42,14 +46,8 @@ export default function AvatarBuilder({ value, onChange }) {
 
   const hairStyles = HAIR_STYLES_BY_GENDER[value.gender] || [];
 
-  return (
-    <ScrollView
-      style={{ flex: 1 }}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.controls}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="on-drag"
-    >
+  const sections = (
+    <>
       <Section title="Gender">
         <SegmentedControl
           options={GENDERS.map((g) => ({ label: g.label, value: g.id, color: g.color }))}
@@ -94,6 +92,22 @@ export default function AvatarBuilder({ value, onChange }) {
           onChange={(id) => update({ clothing: id })}
         />
       </Section>
+    </>
+  );
+
+  if (!scrollable) {
+    return <View style={styles.controls}>{sections}</View>;
+  }
+
+  return (
+    <ScrollView
+      style={{ flex: 1 }}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.controls}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+    >
+      {sections}
     </ScrollView>
   );
 }

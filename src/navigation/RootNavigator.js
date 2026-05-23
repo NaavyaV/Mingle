@@ -5,7 +5,7 @@ import { useUser } from '../context/UserContext';
 import WelcomeScreen from '../screens/WelcomeScreen';
 import LoginScreen from '../screens/LoginScreen';
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
-import HomeScreen from '../screens/HomeScreen';
+import TabNavigator from './TabNavigator';
 import { colors } from '../theme';
 
 const Stack = createNativeStackNavigator();
@@ -37,7 +37,7 @@ export default function RootNavigator() {
     <NavigationContainer theme={navTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
         {user ? (
-          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Main" component={TabNavigator} />
         ) : (
           <>
             <Stack.Screen name="Welcome" component={WelcomeScreen} />

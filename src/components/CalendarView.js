@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme';
 import {
   WEEKDAY_LABELS,
@@ -30,6 +30,17 @@ function formatHourLabel(h) {
   return `${h - 12}p`;
 }
 
+/**
+ * Turns a normalized 0..1 opacity into a 2-char hex alpha suffix
+ * (e.g. 0.2 -> "33"). Used to fade event blocks for overlay schedules.
+ */
+function alphaHex(opacity) {
+  const o = Math.max(0, Math.min(1, Number(opacity) || 0));
+  return Math.round(o * 255)
+    .toString(16)
+    .padStart(2, '0');
+}
+
 function EventBlock({ event, columnWidth }) {
   const start = new Date(event.start.dateTime);
   if (Number.isNaN(start.getTime())) return null;
@@ -37,7 +48,9 @@ function EventBlock({ event, columnWidth }) {
   const durationHrs = eventDuration(event);
   const top = Math.round(Math.max(0, startFrac * HOUR_HEIGHT));
   const height = Math.round(Math.max(28, durationHrs * HOUR_HEIGHT - 2));
-  const accent = hashColor(event.id || event.summary);
+  const accent = event.color || hashColor(event.id || event.summary);
+  // Default fill is ~13% alpha, matching the prior "22" suffix.
+  const fillAlpha = event.opacity != null ? alphaHex(event.opacity * 0.55) : '22';
 
   return (
     <View
@@ -48,8 +61,9 @@ function EventBlock({ event, columnWidth }) {
           height,
           left: 2,
           width: Math.max(0, Math.floor(columnWidth) - 4),
-          backgroundColor: `${accent}22`,
+          backgroundColor: `${accent}${fillAlpha}`,
           borderLeftColor: accent,
+          opacity: event.opacity != null ? event.opacity : 1,
         },
       ]}
     >
@@ -94,8 +108,18 @@ function NowLine({ columnWidth, columnIndex }) {
  * more day columns. Events from the supplied schedule are positioned
  * absolutely based on their start time and duration. Pure presentational —
  * callers decide which date range to show via `dates`.
+ *
+ * Optional `onPressTime(date)` lets callers respond to a tap on an empty
+ * slot in the grid (rounded to the nearest 15 minutes). `maxHeight`
+ * caps the scrollable area height.
  */
-export default function CalendarView({ schedule, dates, columnWidth }) {
+export default function CalendarView({
+  schedule,
+  dates,
+  columnWidth,
+  onPressTime,
+  maxHeight = 260,
+}) {
   const hours = useMemo(
     () => Array.from({ length: TOTAL_HOURS + 1 }).map((_, i) => DAY_START + i),
     []
@@ -145,7 +169,7 @@ export default function CalendarView({ schedule, dates, columnWidth }) {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        style={styles.scroll}
+        style={[styles.scroll, { maxHeight }]}
         contentContainerStyle={{ height: TOTAL_HOURS * HOUR_HEIGHT }}
       >
         <View style={styles.grid}>
@@ -168,7 +192,21 @@ export default function CalendarView({ schedule, dates, columnWidth }) {
                 <View
                   key={h}
                   style={[styles.hourCell, { height: HOUR_HEIGHT }]}
-                />
+                >
+                  {onPressTime
+                    ? [0, 15, 30, 45].map((m) => (
+                        <Pressable
+                          key={m}
+                          onPress={() => {
+                            const date = new Date(d);
+                            date.setHours(h, m, 0, 0);
+                            onPressTime(date);
+                          }}
+                          style={{ flex: 1 }}
+                        />
+                      ))
+                    : null}
+                </View>
               ))}
               {eventsByDay[idx].map((ev) => (
                 <EventBlock key={ev.id} event={ev} columnWidth={columnWidth} />
@@ -226,7 +264,7 @@ const styles = StyleSheet.create({
   headerDateWrapToday: { backgroundColor: colors.primary },
   headerDate: { ...typography.caption, color: colors.text, fontWeight: '700' },
   headerDateToday: { color: colors.textInverse },
-  scroll: { maxHeight: 260 },
+  scroll: {},
   grid: { flexDirection: 'row' },
   rail: { paddingTop: 0 },
   railHour: {

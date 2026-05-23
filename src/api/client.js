@@ -61,6 +61,7 @@ async function request(path, { method = 'GET', body, signal } = {}) {
 }
 
 export const api = {
+  // users
   listUsers: () => request('/api/users'),
   getUserByUsername: (username) =>
     request(`/api/users/by-username/${encodeURIComponent(username)}`),
@@ -68,4 +69,34 @@ export const api = {
   updateUser: (id, patch) =>
     request(`/api/users/${id}`, { method: 'PATCH', body: patch }),
   deleteUser: (id) => request(`/api/users/${id}`, { method: 'DELETE' }),
+
+  // friends
+  getFriends: (username) =>
+    request(`/api/friends/${encodeURIComponent(username)}`),
+  requestFriend: (from, to) =>
+    request('/api/friends/request', { method: 'POST', body: { from, to } }),
+  acceptFriend: (me, other) =>
+    request('/api/friends/accept', { method: 'POST', body: { me, other } }),
+  removeFriend: (me, other) =>
+    request('/api/friends', { method: 'DELETE', body: { me, other } }),
+
+  // messages
+  listConversations: (username) =>
+    request(`/api/messages/conversations/${encodeURIComponent(username)}`),
+  getThread: (me, other) =>
+    request(
+      `/api/messages/thread?me=${encodeURIComponent(me)}&other=${encodeURIComponent(other)}`
+    ),
+  sendMessage: (payload) =>
+    request('/api/messages', { method: 'POST', body: payload }),
+
+  // events
+  listEvents: () => request('/api/events'),
+  getEvent: (id) => request(`/api/events/${encodeURIComponent(id)}`),
+  createEvent: (payload) => request('/api/events', { method: 'POST', body: payload }),
+  setEventGoing: (id, username, going) =>
+    request(`/api/events/${encodeURIComponent(id)}/going`, {
+      method: 'POST',
+      body: { username, going },
+    }),
 };
