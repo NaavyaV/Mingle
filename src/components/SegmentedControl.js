@@ -6,13 +6,20 @@ export default function SegmentedControl({ options, value, onChange }) {
     <View style={styles.track}>
       {options.map((opt) => {
         const selected = opt.value === value;
+        const customColor = opt.color;
+        const textStyle = [
+          styles.text,
+          customColor ? styles.textColored : null,
+          selected && !customColor && styles.textActive,
+          customColor && { color: customColor },
+        ];
         return (
           <Pressable
             key={opt.value}
             onPress={() => onChange(opt.value)}
             style={[styles.seg, selected && styles.segActive]}
           >
-            <Text style={[styles.text, selected && styles.textActive]}>{opt.label}</Text>
+            <Text style={textStyle}>{opt.label}</Text>
           </Pressable>
         );
       })}
@@ -44,4 +51,5 @@ const styles = StyleSheet.create({
   },
   text: { ...typography.caption, color: colors.textMuted, fontWeight: '600' },
   textActive: { color: colors.text },
+  textColored: { fontSize: 20, fontWeight: '800' },
 });

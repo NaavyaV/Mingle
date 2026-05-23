@@ -5,20 +5,19 @@ import {
   StyleSheet,
   FlatList,
   RefreshControl,
-  Pressable,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Avatar from '../components/Avatar/Avatar';
 import UserCard from '../components/UserCard';
 import DayPicker from '../components/DayPicker';
+import AccountMenu from '../components/AccountMenu';
 import { useUser } from '../context/UserContext';
 import { api } from '../api/client';
 import { colors, spacing, typography } from '../theme';
 
 export default function HomeScreen() {
-  const { user, signOut } = useUser();
+  const { user, signOut, deleteAccount } = useUser();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -47,13 +46,6 @@ export default function HomeScreen() {
     return self ? [self, ...others] : users;
   }, [users, user]);
 
-  const handleSignOut = () => {
-    Alert.alert('Sign out?', 'You can sign back in with your username anytime.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: signOut },
-    ]);
-  };
-
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar style="dark" />
@@ -64,11 +56,11 @@ export default function HomeScreen() {
             {user?.school ? user.school : 'Around campus'}
           </Text>
         </View>
-        <Pressable onPress={handleSignOut} hitSlop={10}>
-          {user ? (
+        {user ? (
+          <AccountMenu onSignOut={signOut} onDelete={deleteAccount}>
             <Avatar config={user.avatar} size={44} mode="bust" ring />
-          ) : null}
-        </Pressable>
+          </AccountMenu>
+        ) : null}
       </View>
 
       <DayPicker value={date} onChange={setDate} />

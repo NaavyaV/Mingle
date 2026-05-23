@@ -26,8 +26,8 @@ export const CLOTHING_COLORS = [
 ];
 
 export const GENDERS = [
-  { id: 'female', label: '♀' },
-  { id: 'male', label: '♂' },
+  { id: 'male', label: '♂', color: '#3D8BFF' },
+  { id: 'female', label: '♀', color: '#FF5DA2' },
 ];
 
 export const HAIR_STYLES_BY_GENDER = {
@@ -36,12 +36,10 @@ export const HAIR_STYLES_BY_GENDER = {
     { id: 'buzz', label: 'Buzz' },
     { id: 'quiff', label: 'Quiff' },
     { id: 'curly', label: 'Curly' },
-    { id: 'fade', label: 'Fade' },
   ],
   female: [
     { id: 'long', label: 'Long' },
     { id: 'bob', label: 'Bob' },
-    { id: 'bun', label: 'Bun' },
     { id: 'ponytail', label: 'Ponytail' },
     { id: 'wavy', label: 'Wavy' },
   ],
@@ -55,9 +53,9 @@ export const DEFAULT_HAIR_BY_GENDER = {
 export const DEFAULT_AVATAR = {
   skin: 'warm',
   hairColor: 'brown',
-  hairStyle: 'long',
+  hairStyle: 'short',
   clothing: 'navy',
-  gender: 'female',
+  gender: 'male',
 };
 
 export function getColorById(list, id) {

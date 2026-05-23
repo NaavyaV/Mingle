@@ -67,4 +67,5 @@ export const api = {
   createUser: (payload) => request('/api/users', { method: 'POST', body: payload }),
   updateUser: (id, patch) =>
     request(`/api/users/${id}`, { method: 'PATCH', body: patch }),
+  deleteUser: (id) => request(`/api/users/${id}`, { method: 'DELETE' }),
 };

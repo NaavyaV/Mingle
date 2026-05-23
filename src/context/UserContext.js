@@ -69,9 +69,18 @@ export function UserProvider({ children }) {
     await persist(null);
   }, [persist]);
 
+  const deleteAccount = useCallback(async () => {
+    if (!user?._id) return;
+    try {
+      await api.deleteUser(user._id);
+    } finally {
+      await persist(null);
+    }
+  }, [user, persist]);
+
   const value = useMemo(
-    () => ({ user, hydrated, signIn, signUp, signOut, setUser: persist }),
-    [user, hydrated, signIn, signUp, signOut, persist]
+    () => ({ user, hydrated, signIn, signUp, signOut, deleteAccount, setUser: persist }),
+    [user, hydrated, signIn, signUp, signOut, deleteAccount, persist]
   );
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;

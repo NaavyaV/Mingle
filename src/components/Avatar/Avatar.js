@@ -1,14 +1,5 @@
 import { View } from 'react-native';
-import Svg, {
-  Circle,
-  Ellipse,
-  Path,
-  Rect,
-  G,
-  Defs,
-  LinearGradient,
-  Stop,
-} from 'react-native-svg';
+import Svg, { Circle, Ellipse, Path, G } from 'react-native-svg';
 import Hair from './Hair';
 import {
   SKIN_TONES,
@@ -152,33 +143,19 @@ function FemaleBody({ skin, shirtColor }) {
   );
 }
 
-function Background() {
-  return (
-    <G>
-      <Defs>
-        <LinearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#EEF1F8" stopOpacity="1" />
-          <Stop offset="1" stopColor="#FFFFFF" stopOpacity="1" />
-        </LinearGradient>
-      </Defs>
-      <Rect x={0} y={0} width={VB_W} height={VB_H} fill="url(#bg)" />
-      {/* soft floor shadow */}
-      <Ellipse cx={100} cy={306} rx={56} ry={6} fill="#0B1020" opacity={0.08} />
-    </G>
-  );
-}
-
 /**
  * Avatar renders a full-body character. `mode` controls framing:
  *   - 'full':  whole body, used in the builder + Welcome.
  *   - 'bust':  head and shoulders only, used in tight spaces like list rows.
+ *
+ * The SVG itself is fully transparent — the surrounding container (ring,
+ * card, etc.) is responsible for any background fill.
  */
 export default function Avatar({
   config = DEFAULT_AVATAR,
   size = 160,
   mode = 'full',
   ring = false,
-  background = true,
 }) {
   const merged = ensureValidHair({ ...DEFAULT_AVATAR, ...(config || {}) });
   const skin = getColorById(SKIN_TONES, merged.skin);
@@ -186,15 +163,14 @@ export default function Avatar({
   const shirt = getColorById(CLOTHING_COLORS, merged.clothing);
 
   const isBust = mode === 'bust';
-  const viewBox = isBust ? '40 30 120 120' : `0 0 ${VB_W} ${VB_H}`;
+  const viewBox = isBust ? '40 16 120 120' : `0 0 ${VB_W} ${VB_H}`;
   const aspect = isBust ? 1 : VB_W / VB_H;
-  const width = size * aspect;
+  const width = Math.round(size * aspect);
 
   const Body = merged.gender === 'female' ? FemaleBody : MaleBody;
 
   const inner = (
     <Svg width={width} height={size} viewBox={viewBox}>
-      {background ? <Background /> : null}
       <Body skin={skin} shirtColor={shirt} />
       <Hair gender={merged.gender} style={merged.hairStyle} color={hair} />
       <Face />

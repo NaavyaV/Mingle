@@ -39,7 +39,6 @@ const STEPS = [
   {
     id: 'avatar',
     title: 'Build your avatar',
-    subtitle: 'Make it feel like you.',
     component: AvatarStep,
     canContinue: AvatarStep.canContinue,
   },
@@ -54,7 +53,7 @@ const INITIAL = {
   scheduleVisibility: 'friends',
   locationStatus: 'pending',
   avatar: DEFAULT_AVATAR,
-  status: 'studying rn',
+  status: '',
 };
 
 export default function OnboardingScreen({ navigation }) {

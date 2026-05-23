@@ -32,10 +32,11 @@ function formatHourLabel(h) {
 
 function EventBlock({ event, columnWidth }) {
   const start = new Date(event.start.dateTime);
+  if (Number.isNaN(start.getTime())) return null;
   const startFrac = fractionalHour(start) - DAY_START;
   const durationHrs = eventDuration(event);
-  const top = Math.max(0, startFrac * HOUR_HEIGHT);
-  const height = Math.max(28, durationHrs * HOUR_HEIGHT - 2);
+  const top = Math.round(Math.max(0, startFrac * HOUR_HEIGHT));
+  const height = Math.round(Math.max(28, durationHrs * HOUR_HEIGHT - 2));
   const accent = hashColor(event.id || event.summary);
 
   return (
@@ -46,7 +47,7 @@ function EventBlock({ event, columnWidth }) {
           top,
           height,
           left: 2,
-          width: columnWidth - 4,
+          width: Math.max(0, Math.floor(columnWidth) - 4),
           backgroundColor: `${accent}22`,
           borderLeftColor: accent,
         },
@@ -68,7 +69,8 @@ function NowLine({ columnWidth, columnIndex }) {
   const now = new Date();
   const frac = fractionalHour(now) - DAY_START;
   if (frac < 0 || frac > TOTAL_HOURS) return null;
-  const top = frac * HOUR_HEIGHT;
+  const top = Math.round(frac * HOUR_HEIGHT);
+  const col = Math.floor(columnWidth);
   return (
     <View
       pointerEvents="none"
@@ -76,8 +78,8 @@ function NowLine({ columnWidth, columnIndex }) {
         styles.nowLine,
         {
           top,
-          left: columnIndex * columnWidth + 2,
-          width: columnWidth - 4,
+          left: columnIndex * col + 2,
+          width: Math.max(0, col - 4),
         },
       ]}
     >
@@ -224,7 +226,7 @@ const styles = StyleSheet.create({
   headerDateWrapToday: { backgroundColor: colors.primary },
   headerDate: { ...typography.caption, color: colors.text, fontWeight: '700' },
   headerDateToday: { color: colors.textInverse },
-  scroll: { maxHeight: 380 },
+  scroll: { maxHeight: 260 },
   grid: { flexDirection: 'row' },
   rail: { paddingTop: 0 },
   railHour: {

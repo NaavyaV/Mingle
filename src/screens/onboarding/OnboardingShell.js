@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
   copy: { gap: spacing.sm },
   title: { ...typography.display, color: colors.text },
   subtitle: { ...typography.body, color: colors.textMuted },
-  stepBody: { flex: 1, paddingTop: spacing.lg },
+  stepBody: { flex: 1, paddingTop: spacing.md },
   footer: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.md },
   errorText: {
     color: colors.danger,

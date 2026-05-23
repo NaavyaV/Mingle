@@ -56,7 +56,7 @@ export default function ScheduleStep({ value, setValue }) {
   const railWidth = 44;
   const availableForColumns =
     screenWidth - containerHorizontalPadding - calendarBorder - railWidth;
-  const columnWidth = Math.max(46, availableForColumns / dates.length);
+  const columnWidth = Math.floor(Math.max(46, availableForColumns / dates.length));
 
   const handleDemo = () => {
     setValue({
@@ -111,6 +111,7 @@ export default function ScheduleStep({ value, setValue }) {
       <Button
         title={hasSchedule ? 'Shuffle demo schedule' : 'Use a demo schedule'}
         variant={hasSchedule ? 'ghost' : 'primary'}
+        size={hasSchedule ? 'sm' : 'md'}
         onPress={handleDemo}
       />
 
@@ -162,14 +163,14 @@ export default function ScheduleStep({ value, setValue }) {
 ScheduleStep.canContinue = (v) => !!v.schedule;
 
 const styles = StyleSheet.create({
-  wrap: { gap: spacing.lg, paddingBottom: spacing.xl },
+  wrap: { gap: spacing.md, paddingBottom: spacing.xl },
   importRow: { flexDirection: 'row', gap: spacing.md },
   dividerWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   divider: { flex: 1, height: 1, backgroundColor: colors.border },
   dividerText: { ...typography.caption, color: colors.textMuted },
-  calendarBlock: { gap: spacing.md },
+  calendarBlock: { gap: spacing.sm },
   calendarHeader: { gap: 2 },
-  calendarRangeLabel: { ...typography.h2, color: colors.text },
+  calendarRangeLabel: { ...typography.h2, color: colors.text, fontSize: 18 },
   calendarSubLabel: { ...typography.small, color: colors.textMuted },
   placeholderTitle: { ...typography.h2, color: colors.text },
   placeholderBody: {
@@ -177,7 +178,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: spacing.xs,
   },
-  shareSection: { gap: spacing.sm, marginTop: spacing.md },
+  shareSection: { gap: spacing.sm, marginTop: spacing.sm },
   sectionLabel: {
     ...typography.caption,
     color: colors.textMuted,

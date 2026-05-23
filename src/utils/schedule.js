@@ -21,27 +21,53 @@ const COURSE_POOL = [
   { summary: 'ART 130 — 2D Design', location: 'Studio · Room 7' },
   { summary: 'HIST 105 — World History', location: 'Bldg A · Room 312' },
   { summary: 'PHIL 120 — Ethics', location: 'Bldg B · Room 220' },
+  { summary: 'BUSN 200 — Microeconomics', location: 'Bldg E · Room 230' },
+  { summary: 'COMM 130 — Public Speaking', location: 'Bldg C · Room 210' },
 ];
 
-const EXTRA_POOL = [
-  { summary: 'Study session', location: 'Library · 2nd floor' },
-  { summary: 'Lunch break', location: 'Student Union' },
+const WORKOUT_POOL = [
+  { summary: 'Gym session', location: 'Rec Center' },
+  { summary: 'Morning run', location: 'Campus loop' },
+  { summary: 'Yoga class', location: 'Rec Center · Studio B' },
+  { summary: 'Pickup basketball', location: 'Rec Center · Court 2' },
+  { summary: 'Climbing', location: 'Rec Center · Wall' },
+];
+
+const STUDY_POOL = [
+  { summary: 'Study group', location: 'Library · 2nd floor' },
+  { summary: 'Library time', location: 'Library · Quiet zone' },
+  { summary: 'Homework block', location: 'Library · 3rd floor' },
+  { summary: 'Project work', location: 'Library · Collab room' },
+];
+
+const SOCIAL_POOL = [
   { summary: 'Coffee w/ friend', location: 'Campus Cafe' },
-  { summary: 'Gym', location: 'Rec Center' },
-  { summary: 'Club meeting', location: 'Bldg E · Room 101' },
-  { summary: 'Office hours', location: 'Faculty Wing' },
+  { summary: 'Boba run', location: 'Sharetea on College Ave' },
+  { summary: 'Movie night', location: 'Mason’s dorm' },
+  { summary: 'Game night', location: 'Student Union · Game room' },
+  { summary: 'Concert at the union', location: 'Student Union · Stage' },
 ];
 
-const TIME_SLOTS = [
-  { h: 8, m: 0 },
-  { h: 9, m: 30 },
-  { h: 11, m: 0 },
-  { h: 13, m: 0 },
-  { h: 14, m: 30 },
-  { h: 16, m: 0 },
+const MEAL_POOL = [
+  { summary: 'Lunch break', location: 'Student Union' },
+  { summary: 'Quick lunch', location: 'Campus Cafe' },
+  { summary: 'Lunch w/ classmates', location: 'Outside Bldg A' },
+  { summary: 'Coffee + breakfast', location: 'Campus Cafe' },
+  { summary: 'Meal prep', location: 'Apartment kitchen' },
+  { summary: 'Brunch w/ roommates', location: 'Pancake House on 5th' },
+  { summary: 'Dinner w/ friends', location: 'Tacos & Co.' },
 ];
 
-const WEEK_DAYS = ['MO', 'TU', 'WE', 'TH', 'FR'];
+const CLUB_POOL = [
+  { summary: 'CS Club meeting', location: 'Bldg A · Room 101' },
+  { summary: 'Volunteer hours', location: 'Community Center' },
+  { summary: 'Office hours w/ Prof Lee', location: 'Faculty Wing · A-220' },
+  { summary: 'Tutoring session', location: 'Learning Center' },
+];
+
+function pickFromSeed(arr, seed) {
+  return arr[((seed % arr.length) + arr.length) % arr.length];
+}
 
 function pickN(arr, n, seedOffset = 0) {
   const copy = [...arr];
@@ -70,9 +96,98 @@ function getMondayOfThisWeek() {
 }
 
 /**
- * Build a believable weekly course schedule plus a handful of one-off events
- * for the current week. Returns an object that mirrors the shape of a Google
- * Calendar `events.list` response.
+ * Each weekday's plan describes the bones of a realistic college day:
+ *   pool: which category to draw from (course pool gets a stable index)
+ *   h, m: start time
+ *   dur: length in minutes
+ *   classIdx: when pool === 'course', which of the user's 4 courses to use
+ *
+ * Saturday and Sunday lean on social/workout/study activities so the week
+ * never has an empty day in the calendar grid.
+ */
+const WEEK_PLAN = [
+  // Monday
+  [
+    { pool: 'meal', subPool: 'breakfast', h: 8, m: 0, dur: 30 },
+    { pool: 'course', classIdx: 0, h: 9, m: 0, dur: 75 },
+    { pool: 'meal', h: 12, m: 15, dur: 45 },
+    { pool: 'course', classIdx: 1, h: 14, m: 0, dur: 75 },
+    { pool: 'workout', h: 17, m: 0, dur: 60 },
+  ],
+  // Tuesday
+  [
+    { pool: 'course', classIdx: 2, h: 10, m: 30, dur: 75 },
+    { pool: 'meal', h: 12, m: 30, dur: 30 },
+    { pool: 'study', h: 14, m: 0, dur: 90 },
+    { pool: 'club', h: 17, m: 30, dur: 60 },
+  ],
+  // Wednesday
+  [
+    { pool: 'workout', h: 7, m: 30, dur: 45 },
+    { pool: 'course', classIdx: 0, h: 9, m: 0, dur: 75 },
+    { pool: 'meal', h: 12, m: 15, dur: 45 },
+    { pool: 'course', classIdx: 3, h: 13, m: 0, dur: 75 },
+    { pool: 'social', h: 18, m: 30, dur: 90 },
+  ],
+  // Thursday
+  [
+    { pool: 'course', classIdx: 2, h: 10, m: 30, dur: 75 },
+    { pool: 'meal', h: 12, m: 30, dur: 30 },
+    { pool: 'study', h: 14, m: 30, dur: 90 },
+    { pool: 'workout', h: 17, m: 0, dur: 60 },
+  ],
+  // Friday
+  [
+    { pool: 'course', classIdx: 0, h: 9, m: 0, dur: 75 },
+    { pool: 'meal', h: 12, m: 15, dur: 45 },
+    { pool: 'course', classIdx: 1, h: 14, m: 0, dur: 75 },
+    { pool: 'social', h: 16, m: 30, dur: 60 },
+  ],
+  // Saturday
+  [
+    { pool: 'meal', subPool: 'brunch', h: 11, m: 0, dur: 75 },
+    { pool: 'workout', h: 14, m: 30, dur: 90 },
+    { pool: 'social', h: 20, m: 0, dur: 120 },
+  ],
+  // Sunday
+  [
+    { pool: 'workout', h: 9, m: 30, dur: 45 },
+    { pool: 'meal', subPool: 'mealprep', h: 12, m: 0, dur: 60 },
+    { pool: 'study', h: 15, m: 0, dur: 120 },
+    { pool: 'club', h: 18, m: 0, dur: 60 },
+  ],
+];
+
+function pickActivity(pool, subPool, seed, courses, idx) {
+  if (pool === 'course') {
+    return courses[idx % courses.length];
+  }
+  if (pool === 'meal' && subPool === 'breakfast') {
+    return pickFromSeed(MEAL_POOL.filter((m) => /breakfast|coffee/i.test(m.summary)), seed);
+  }
+  if (pool === 'meal' && subPool === 'brunch') {
+    return pickFromSeed(MEAL_POOL.filter((m) => /brunch/i.test(m.summary)), seed);
+  }
+  if (pool === 'meal' && subPool === 'mealprep') {
+    return pickFromSeed(MEAL_POOL.filter((m) => /meal prep|dinner/i.test(m.summary)), seed);
+  }
+  if (pool === 'meal') {
+    return pickFromSeed(
+      MEAL_POOL.filter((m) => /lunch/i.test(m.summary)),
+      seed
+    );
+  }
+  if (pool === 'workout') return pickFromSeed(WORKOUT_POOL, seed);
+  if (pool === 'study') return pickFromSeed(STUDY_POOL, seed);
+  if (pool === 'social') return pickFromSeed(SOCIAL_POOL, seed);
+  if (pool === 'club') return pickFromSeed(CLUB_POOL, seed);
+  return { summary: 'Free time', location: '' };
+}
+
+/**
+ * Build a believable weekly schedule for the current week. Every day (Mon–Sun)
+ * gets at least two events. Returns an object shaped like a Google Calendar
+ * `events.list` response.
  */
 export function buildDemoSchedule({ seed = 0 } = {}) {
   const timeZone = 'America/Chicago';
@@ -81,42 +196,25 @@ export function buildDemoSchedule({ seed = 0 } = {}) {
   const courses = pickN(COURSE_POOL, 4, seed);
   const events = [];
 
-  courses.forEach((course, idx) => {
-    const slot = TIME_SLOTS[(idx + seed) % TIME_SLOTS.length];
-    const day = WEEK_DAYS[(idx * 2 + seed) % WEEK_DAYS.length];
-    const altDay = WEEK_DAYS[(idx * 2 + seed + 2) % WEEK_DAYS.length];
-    const dayIndex = WEEK_DAYS.indexOf(day);
+  WEEK_PLAN.forEach((day, dayIdx) => {
     const eventDate = new Date(monday);
-    eventDate.setDate(monday.getDate() + dayIndex);
+    eventDate.setDate(monday.getDate() + dayIdx);
 
-    events.push({
-      id: `course-${seed}-${idx}`,
-      summary: course.summary,
-      location: course.location,
-      description: 'Recurring class',
-      start: { dateTime: isoOn(eventDate, slot.h, slot.m), timeZone },
-      end: { dateTime: isoOn(eventDate, slot.h + 1, slot.m + 15), timeZone },
-      recurrence: [`RRULE:FREQ=WEEKLY;BYDAY=${day},${altDay}`],
-      colorId: String((idx % 9) + 1),
-      source: 'demo',
-    });
-  });
+    day.forEach((item, slotIdx) => {
+      const activity = pickActivity(item.pool, item.subPool, seed + dayIdx * 11 + slotIdx, courses, item.classIdx ?? slotIdx);
+      const startIso = isoOn(eventDate, item.h, item.m);
+      const endDate = new Date(eventDate);
+      endDate.setHours(item.h, item.m + item.dur, 0, 0);
 
-  // A few one-off events sprinkled through the week
-  const extras = pickN(EXTRA_POOL, 3, seed + 1);
-  extras.forEach((extra, idx) => {
-    const dayIndex = (idx * 2 + seed) % 5;
-    const eventDate = new Date(monday);
-    eventDate.setDate(monday.getDate() + dayIndex);
-    const slot = TIME_SLOTS[(idx + seed + 3) % TIME_SLOTS.length];
-    events.push({
-      id: `extra-${seed}-${idx}`,
-      summary: extra.summary,
-      location: extra.location,
-      description: 'One-off',
-      start: { dateTime: isoOn(eventDate, slot.h, slot.m), timeZone },
-      end: { dateTime: isoOn(eventDate, slot.h + 1, 0), timeZone },
-      source: 'demo',
+      events.push({
+        id: `ev-${seed}-${dayIdx}-${slotIdx}`,
+        summary: activity.summary,
+        location: activity.location || undefined,
+        description: item.pool === 'course' ? 'Class' : 'Activity',
+        start: { dateTime: startIso, timeZone },
+        end: { dateTime: endDate.toISOString(), timeZone },
+        source: 'demo',
+      });
     });
   });
 
